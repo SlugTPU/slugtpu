@@ -8,21 +8,46 @@ from pathlib import Path
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge
+from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge
 from cocotb_tools.runner import get_runner
 
 LANGUAGE = os.getenv("HDL_TOPLEVEL_LANG", "verilog").lower().strip()
 
 timescale = ("1ps","1ps")
 
+async def clock_start(clk_i, period_ns=10):
+    """Start clock with given period (in ns)"""
+    c = Clock(clk_i, period_ns, units="ns")
+    cocotb.start_soon(c.start(start_high=False))
+
+async def reset_sequence(clk_i, rst_i, num_cycles=10):
+    """Reset sequence"""
+    await FallingEdge(clk_i)
+    rst_i.value = 1
+    await ClockCycles(clk_i, num_cycles)
+    rst_i.value = 0
+    await FallingEdge(clk_i)
+    rst_i.value = 1
+
+
+@cocotb.test()
+async def reset_test(dut):
+    """Test for Initialization"""
+    clk_i = dut.clk_i
+    rst_i = dut.rst_i
+
+    await clock_start(clk_i)
+    await reset_sequence(clk_i, rst_i)
+
+
 @cocotb.test()
 async def fifo_simple_test(dut):
     """Test that data propagates through the FIFO"""
+    clk_i = dut.clk_i
+    rst_i = dut.rst_i
 
-    # Create a 50ns period clock driver on port `clk`
-    clock = Clock(dut.clk_i, 50, unit="ns")
-    # Start the clock. Start it low to avoid issues on the first RisingEdge
-    clock.start(start_high=False)
+    await clock_start(clk_i)
+    await reset_sequence(clk_i, rst_i)
 
     # Synchronize with the clock. This will register the initial `d` value
     await RisingEdge(dut.clk_i)
