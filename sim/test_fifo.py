@@ -25,9 +25,8 @@ async def reset_sequence(clk_i, rst_i, num_cycles=10):
     await FallingEdge(clk_i)
     rst_i.value = 1
     await ClockCycles(clk_i, num_cycles)
-    rst_i.value = 0
     await FallingEdge(clk_i)
-    rst_i.value = 1
+    rst_i.value = 0
 
 
 @cocotb.test()
@@ -49,8 +48,7 @@ async def fifo_simple_test(dut):
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
 
-    # Synchronize with the clock. This will register the initial `d` value
-    await RisingEdge(dut.clk_i)
+    await ClockCycles(clk_i, 67)
 
 
 def test_simple_fifo_runner():
