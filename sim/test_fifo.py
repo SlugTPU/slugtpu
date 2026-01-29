@@ -10,6 +10,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge
 from cocotb_tools.runner import get_runner
+import pytest
 
 LANGUAGE = os.getenv("HDL_TOPLEVEL_LANG", "verilog").lower().strip()
 
@@ -50,21 +51,27 @@ async def fifo_simple_test(dut):
 
     await ClockCycles(clk_i, 67)
 
-
-def test_simple_fifo_runner():
-    sim = os.getenv("SIM", "icarus")
-
+@pytest.mark.parametrize("sim", [("icarus"), ("verilator")])
+def test_simple_fifo_runner(sim):
     proj_path = Path("./rtl").resolve()
 
     if LANGUAGE == "verilog":
         sources = [proj_path/"fifo.sv"]
+
+    build_dir = Path("./sim_build", sim)
+    build_args = []
+
+    if (sim == "verilator"):
+        build_args.append("--trace-fst")
 
     runner = get_runner(sim)
     runner.build(
         sources=sources,
         hdl_toplevel="fifo",
         always=True,
-        timescale=timescale
+        timescale=timescale,
+        build_dir=build_dir,
+        build_args=build_args
     )
 
     runner.test(hdl_toplevel="fifo", test_module="test_fifo,")
