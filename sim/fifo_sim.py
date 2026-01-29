@@ -1,20 +1,8 @@
-# This file is public domain, it can be freely copied without restrictions.
-# SPDX-License-Identifier: CC0-1.0
-from __future__ import annotations
-
-import os
-import random
-from pathlib import Path
-
+import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge
-from cocotb_tools.runner import get_runner
-import pytest
-
-LANGUAGE = os.getenv("HDL_TOPLEVEL_LANG", "verilog").lower().strip()
-
-timescale = ("1ps","1ps")
+from pathlib import Path
 
 async def clock_start(clk_i, period_ns=10):
     """Start clock with given period (in ns)"""
@@ -51,31 +39,9 @@ async def fifo_simple_test(dut):
 
     await ClockCycles(clk_i, 67)
 
-@pytest.mark.parametrize("sim", [("icarus"), ("verilator")])
-def test_simple_fifo_runner(sim):
+# export metadata for registering CocoTB tests to be ran
+def register_tests():
     proj_path = Path("./rtl").resolve()
+    sources = [ proj_path/"fifo.sv" ]
 
-    if LANGUAGE == "verilog":
-        sources = [proj_path/"fifo.sv"]
-
-    build_dir = Path("./sim_build", sim)
-    build_args = []
-
-    if (sim == "verilator"):
-        build_args.append("--trace-fst")
-
-    runner = get_runner(sim)
-    runner.build(
-        sources=sources,
-        hdl_toplevel="fifo",
-        always=True,
-        timescale=timescale,
-        build_dir=build_dir,
-        build_args=build_args
-    )
-
-    runner.test(hdl_toplevel="fifo", test_module="test_fifo,")
-
-
-if __name__ == "__main__":
-    test_simple_fifo_runner()
+    return { "hdl_toplevel": "fifo", "sources": sources }
