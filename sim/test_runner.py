@@ -13,7 +13,6 @@ import importlib
 
 LANGUAGE = os.getenv("HDL_TOPLEVEL_LANG", "verilog").lower().strip()
 
-# @pytest.mark.parametrize("sim", [("icarus"), ("verilator")])
 def test_runner():
     if len(sys.argv) < 1:
         assert 0, "Must provide module name (without .py extension) to test!"
@@ -28,7 +27,6 @@ def test_runner():
     test_module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(test_module)
     test_data = test_module.register_tests()
-    print(f"DEBUG: {test_data}, test_module_name is {test_module_name}")
 
     timescale = ("1ps","1ps")
     sims = ["icarus", "verilator"]
