@@ -2,7 +2,6 @@ export WAVES=1
 export HDL_TOPLEVEL_LANG=verilog
 
 test_fifo:
-	which pytest
 	python3 sim/test_runner.py fifo_sim
 
 clean:
