@@ -1,5 +1,10 @@
-# dump waveforms
-export WAVES := 1
+export WAVES=1
+export HDL_TOPLEVEL_LANG=verilog
 
 test_fifo:
-	HDL_TOPLEVEL_LANG=verilog pytest sim/test_fifo.py -s
+	python3 sim/test_runner.py fifo_sim
+
+clean:
+	rm -Rf sim_build
+
+.PHONY: test_fifo clean

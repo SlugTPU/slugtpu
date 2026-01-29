@@ -1,5 +1,5 @@
 module fifo #(
-    parameter DEPTH_P = 16,
+    parameter DEPTH_P = 7,
     parameter WIDTH_P = 8
 ) (
     input clk_i,
@@ -22,7 +22,7 @@ module fifo #(
     wire  [0:0]               is_full_w, is_empty_w;
 
     assign read_en_w = (ready_i && valid_o);
-    assign write_en_w = (valid_i && ready_o); 
+    assign write_en_w = (valid_i && ready_o);
 
     assign rd_ptr_n = (read_en_w) ? rd_ptr_q + 1 : rd_ptr_q;
     assign wr_ptr_n = (write_en_w) ? wr_ptr_q + 1 : wr_ptr_q;
