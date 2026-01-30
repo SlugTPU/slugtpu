@@ -15,3 +15,7 @@ async def reset_sequence(clk_i, rst_i, num_cycles=10):
     await FallingEdge(clk_i)
     rst_i.value = 0
 
+# stringifies a dict with string keys and integer values into path-safe names
+def stringify_dict(dic):
+    # TODO: possibly fail on reserved characters?
+    return "_".join(f"{k}_{v}" for k, v in sorted(dic.items()))
