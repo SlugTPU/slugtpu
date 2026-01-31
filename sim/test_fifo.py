@@ -7,6 +7,8 @@ from shared import reset_sequence, clock_start
 from runner import run_test
 from collections import deque
 
+tests = ["fifo_simple_test", "fifo_stream_test", "reset_test"]
+
 @cocotb.test()
 async def reset_test(dut):
     """Test for Initialization"""
@@ -15,6 +17,7 @@ async def reset_test(dut):
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
+    await FallingEdge(rst_i)
 
 
 @cocotb.test()
@@ -61,8 +64,22 @@ async def fifo_simple_test(dut):
         await RisingEdge(clk_i)
         assert data_o.value.to_unsigned() == fifo_model.popleft(), "Expected"
 
+@cocotb.test()
+async def fifo_stream_test(dut):
+    assert 0 == 0
+
+@pytest.mark.parametrize("depth_log2_p", [1, 3])
+@pytest.mark.parametrize("testcase", tests)
+def test_fifo_each(depth_log2_p, testcase):
+    """Runs each test independently. Continues on test failure"""
+    proj_path = Path("./rtl").resolve()
+    sources = [ proj_path/"fifo.sv" ]
+
+    run_test(parameters={"DEPTH_LOG2_P": depth_log2_p}, sources=sources, module_name="test_fifo", hdl_toplevel="fifo", testcase=testcase)
+
 @pytest.mark.parametrize("depth_log2_p", [1, 3])
 def test_fifo_all(depth_log2_p):
+    """Runs each test sequentially as one giant test."""
     proj_path = Path("./rtl").resolve()
     sources = [ proj_path/"fifo.sv" ]
 

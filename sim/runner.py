@@ -38,5 +38,5 @@ def run_test(parameters, sources, module_name, hdl_toplevel, testcase=None):
             build_args=build_args
         )
 
-        runner.test(hdl_toplevel=hdl_toplevel, test_module=module_name)
+        runner.test(testcase=testcase, hdl_toplevel=hdl_toplevel, test_module=module_name)
 
