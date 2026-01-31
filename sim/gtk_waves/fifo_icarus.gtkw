@@ -1,0 +1,86 @@
+[*]
+[*] GTKWave Analyzer v3.4.0 (w)1999-2022 BSI
+[*] Sat Jan 31 00:47:49 2026
+[*]
+[dumpfile] "/Users/raph/slugtpu/sim_build/icarus/test_fifo/all/DEPTH_LOG2_P_3/fifo.fst"
+[dumpfile_mtime] "Sat Jan 31 00:46:58 2026"
+[dumpfile_size] 939
+[savefile] "/Users/raph/slugtpu/sim/gtk_waves/fifo_icarus.gtkw"
+[timestart] 117900
+[size] 1616 1025
+[pos] 195 18
+*-15.000000 164700 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1 -1
+[sst_width] 253
+[signals_width] 136
+[sst_expanded] 1
+[sst_vpaned_height] 393
+@200
+-Parameters
+@421
+fifo.DEPTH_LOG2_P
+@420
+fifo.WIDTH_P
+@200
+-
+-Global
+@28
+fifo.clk_i
+fifo.rst_i
+@200
+-
+-Handshakes
+-Inputs
+@28
+fifo.valid_i
+fifo.ready_i
+@200
+-Outputs
+@28
+fifo.valid_o
+fifo.ready_o
+@200
+-
+-Data
+@c00022
+fifo.data_i[7:0]
+@28
+(0)fifo.data_i[7:0]
+(1)fifo.data_i[7:0]
+(2)fifo.data_i[7:0]
+(3)fifo.data_i[7:0]
+(4)fifo.data_i[7:0]
+(5)fifo.data_i[7:0]
+(6)fifo.data_i[7:0]
+(7)fifo.data_i[7:0]
+@1401200
+-group_end
+@c00022
+fifo.data_o[7:0]
+@28
+(0)fifo.data_o[7:0]
+(1)fifo.data_o[7:0]
+(2)fifo.data_o[7:0]
+(3)fifo.data_o[7:0]
+(4)fifo.data_o[7:0]
+(5)fifo.data_o[7:0]
+(6)fifo.data_o[7:0]
+(7)fifo.data_o[7:0]
+@1401200
+-group_end
+@200
+-
+@22
+fifo.rd_ptr_q[3:0]
+fifo.wr_ptr_q[3:0]
+@200
+-
+@28
+fifo.is_full_w
+fifo.is_empty_w
+@200
+-
+@28
+fifo.read_en_w
+fifo.write_en_w
+[pattern_trace] 1
+[pattern_trace] 0
