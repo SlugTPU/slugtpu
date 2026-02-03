@@ -11,9 +11,14 @@ source $YOUR_OSS_CAD_INSTALL_DIRECTORY/oss_cad_suite/environment
 ```
 pip3 install -U pytest
 ```
+You may also need to recompile CocoTB, such as on a ARM Mac.
+```
+python3 -m pip install --force-reinstall --no-binary cocotb cocotb
+```
 4. Ensure the current working directory is in this projects top level directory (i.e. at ~/slugtpu, not ~/slugtpu/sim, etc.). The Makefile uses relative paths to keep things simple.
 5. Make!
 ```
 # Test fifo
 make test_fifo
 ```
+
