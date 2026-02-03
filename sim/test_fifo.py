@@ -53,7 +53,7 @@ async def fifo_simple_test(dut):
         fifo_model.append(i)
         await RisingEdge(clk_i)
 
-    await ReadWrite(clk_i)
+    await ReadOnly(clk_i)
     assert not ready_o.value, "ready_o expected to be low when full!"
 
     # stop sending values
