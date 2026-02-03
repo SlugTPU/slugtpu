@@ -1,20 +1,22 @@
 from systolic_array_model import SystolicArray2x2
 
 
-def run_test():
+def run_test(A=None,B=None):
+    if A is None:
+        A = [[10, 2],
+             [3, 4]]
+    if B is None:
+        B = [[5, 6],
+             [7, 8]]
+
     sa = SystolicArray2x2(input_width=8, weight_width=8)
     sa.reset()
-
-    A = [[1, 2],
-         [3, 4]]
-    B = [[5, 6],
-         [7, 8]]
-
+    
     expected = {
-        "c00": 1*5 + 2*7,   # 19
-        "c01": 1*6 + 2*8,   # 22
-        "c10": 3*5 + 4*7,   # 43
-        "c11": 3*6 + 4*8,   # 50
+        "c00": A[0][0]*B[0][0] + A[0][1]*B[1][0],   # 19
+        "c01": A[0][0]*B[0][1] + A[0][1]*B[1][1],   # 22
+        "c10": A[1][0]*B[0][0] + A[1][1]*B[1][0],   # 43
+        "c11": A[1][0]*B[0][1] + A[1][1]*B[1][1],   # 50
     }
 
     # NOTE: stream COLUMNS of A, ROWS of B
