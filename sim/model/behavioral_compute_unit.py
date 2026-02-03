@@ -266,13 +266,25 @@ class TPU_Compute_Unit:
 
         print(self.on_chip)
 
-        print("Correct")
+        # print("Expected Output")
 
         res = (np.matmul(activations, weights) + bias)
         relu = np.maximum(0, res)
         
         final = (relu - zp) * qsf
-        print(final)
+        
+        tile_11 = self.on_chip[11]
+        tile_12 = self.on_chip[12]
+        tile_21 = self.on_chip[21]
+        tile_22 = self.on_chip[22]
+        assert(np.allclose(tile_11, final[0:2, 0:2]))
+        assert(np.allclose(tile_12, final[0:2, 2:4]))
+        assert(np.allclose(tile_21, final[2:4, 0:2]))
+        assert(np.allclose(tile_22, final[2:4, 2:4]))
+
+        print("\n\n\n\nSimulation Matches Expected")
+        print("Simulation Passed!")
+
 
 t = TPU_Compute_Unit()
 t.sim()
