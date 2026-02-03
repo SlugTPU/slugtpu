@@ -4,6 +4,7 @@ Note: This file is almost 100% human generated (thats why it sucks)
 
 import numpy as np
 import math
+from sim.model.systolic_array_model import SystolicArray2x2
 
 class TPU_Compute_Unit:
     def __init__(self):
@@ -168,13 +169,19 @@ class TPU_Compute_Unit:
         self.fifo.append(weights)
 
     def do_matmul(self, activation_addr, bool_feedback, store_addr):
+        USE_SYSTOLIC = True
         A = self.on_chip[activation_addr]
         W = self.fifo.pop(0)
         accum = 0
         if self.res is not None:
             accum = self.res
         print("before accum\n", self.res)
-        self.res = np.matmul(A, W) + accum
+        if USE_SYSTOLIC == False:
+            self.res = np.matmul(A, W) + accum
+        else:
+            sa = SystolicArray2x2(input_width=8, weight_width=8)
+            
+
         print("after\n", self.res)
         #if this is partial output, we gotta wait for the next tile
         if bool_feedback:
