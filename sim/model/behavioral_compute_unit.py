@@ -276,30 +276,3 @@ class TPU_Compute_Unit:
 
 t = TPU_Compute_Unit()
 t.sim()
-# t.basic_correctness_test()
-# t.sim(None)
-
-
-        # expected_output = np.load('expected_output.npz')['arr_0']
-        # float_input = np.load('input_quantized.npz')['arr_0']
-
-        # test_input_quantized = float_input / self.input_scale + self.input_zero_point
-
-        # layer1_32 = np.matmul(test_input_quantized, self.layer1_weights.T) + (self.layer1_bias)
-        # # print(layer1_32)
-        # layer1_relu = np.maximum(0, layer1_32)
-        
-        # layer1_q = (layer1_relu - self.layer1_zero_point) * self.layer1_qsf
-        # self.check = layer1_q
-        # print(layer1_q)
-
-        # layer2_32 = (np.matmul(layer1_q, self.layer2_weights.T) + (self.layer2_bias ))
-        # layer2_q = ((layer2_32 - self.layer2_zero_point ) * self.layer2_qsf )
-        # # print(layer2_q)
-
-        # # This is where we stop TPU and do sigmoid on host/cpu
-
-        # output = self.sigmoid((layer2_q + self.layer2_zero_point) * self.layer2_scale)
-        # output = output / self.output_scale + self.output_zero_point
-        # print(np.round(output.flatten()).astype(np.int8))
-        # print(expected_output)
