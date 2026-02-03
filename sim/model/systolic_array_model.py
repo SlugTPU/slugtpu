@@ -1,4 +1,5 @@
-from sim.model.pe import PE
+# from sim.model.pe import PE
+from pe import PE
 
 
 class SystolicArray2x2:

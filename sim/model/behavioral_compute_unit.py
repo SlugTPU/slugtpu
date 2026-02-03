@@ -4,10 +4,12 @@ Note: This file is almost 100% human generated (thats why it sucks)
 
 import numpy as np
 import math
-from sim.model.systolic_array_model import SystolicArray2x2
+from test_systolic_array import run_test as run_systolic_array
 
 class TPU_Compute_Unit:
+    
     def __init__(self):
+        '''
         weights = np.load('tflite_weights.npz')
         biases = np.load('tflite_biases.npz')
         scales = np.load('tflite_scales.npz')
@@ -53,7 +55,7 @@ class TPU_Compute_Unit:
 
         self.layer1_bias_scale = scales["layer1_bias_scale"]
         self.layer2_bias_scale = scales["layer2_bias_scale"]
-
+        '''
         self.on_chip = {}
         self.off_chip_additional = {}
         self.biases = None
@@ -179,8 +181,12 @@ class TPU_Compute_Unit:
         if USE_SYSTOLIC == False:
             self.res = np.matmul(A, W) + accum
         else:
-            sa = SystolicArray2x2(input_width=8, weight_width=8)
+            _, out = run_systolic_array(A, W)
             
+            print("expected\n", np.matmul(A, W))
+            self.res = np.array([[out["c00"], out["c01"]], [out["c10"], out["c11"]]])
+            print("got\n", self.res) 
+            self.res = self.res + accum
 
         print("after\n", self.res)
         #if this is partial output, we gotta wait for the next tile
