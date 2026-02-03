@@ -32,7 +32,7 @@ class PE:
             "pe_weight_o": self.pe_weight_o,
             "pe_input_o": self.pe_input_o,
             "pe_weight_valid_o": self.pe_weight_valid_o,
-            "pe_input_valid_o": self.pe_input_valid_o,
+            "pe_input_valid_o": self.pe_input_valid_o
         }
         
         
