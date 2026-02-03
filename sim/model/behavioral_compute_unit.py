@@ -53,6 +53,14 @@ class TPU_Compute_Unit:
         self.layer1_bias_scale = scales["layer1_bias_scale"]
         self.layer2_bias_scale = scales["layer2_bias_scale"]
 
+        self.on_chip = {}
+        self.off_chip_additional = {}
+        self.biases = None
+        self.zp = None
+        self.qsf = None
+        self.fifo = []
+        self.res = None
+
     def sigmoid(self, x):
         return 1 / (1 + np.exp(-x))
 
@@ -85,13 +93,13 @@ class TPU_Compute_Unit:
         print(np.round(output.flatten()).astype(np.int8))
         print(expected_output)
 
-    def sim(self, instuctions):
+    def high_level_sim(self):
         expected_output = np.load('expected_output.npz')['arr_0']
         float_input = np.load('input_quantized.npz')['arr_0']
 
         test_input_quantized = float_input / self.input_scale + self.input_zero_point
 
-        SYSTOLIC_DIM = 8
+        SYSTOLIC_DIM = 2
         # These are hardcoded testing values
         # First Matmul is 32x20 * 20x16 = 32x16
         #       8 output tiles, 4 down, two across
@@ -134,18 +142,129 @@ class TPU_Compute_Unit:
         # Signal whether or not to reuse partial sum
         # Shadowbuffer control 
         # Pipelined data flow - we are modeling everything like a square, but really its a rhombus
-        # Yeah that didnt make much sense but hopefully u know what i mean
 
 
         print("="*100)
         print(C)
         print(np.allclose(self.check.astype(np.int8), C))
 
+    # size is implicit here
+    def gmem2smem(self, off_chip_logical, on_chip_addr):
+        self.on_chip[on_chip_addr] = off_chip_logical
+    
+    def smem2gmem(self, off_chip_addr, on_chip_addr):
+        self.off_chip_additional[off_chip_addr] = self.on_chip[on_chip_addr]
 
+    def load_bias(self, bias_addr_logical):
+        self.biases=bias_addr_logical
+
+    def load_qsf(self, qsf_addr_logical):
+        self.qsf = qsf_addr_logical
+
+    def load_zp(self, zp_logical):
+        self.zp = zp_logical
+    
+    def load_weights(self, weights):
+        self.fifo.append(weights)
+
+    def do_matmul(self, activation_addr, bool_feedback, store_addr):
+        A = self.on_chip[activation_addr]
+        W = self.fifo.pop(0)
+        accum = 0
+        if self.res is not None:
+            accum = self.res
+        print("before accum\n", self.res)
+        self.res = np.matmul(A, W) + accum
+        print("after\n", self.res)
+        #if this is partial output, we gotta wait for the next tile
+        if bool_feedback:
+            return
+    
+        after_bias = self.res + self.biases
+        print("after bias\n", after_bias)
+        relu = np.maximum(0, after_bias)
+        post_zp = relu - self.zp
+        print("after zp\n", post_zp)
+        final = post_zp * self.qsf
+        print("final\n", final)
+        assert(store_addr != None)
+        self.on_chip[store_addr] = final
+        self.res = 0
+
+    def sim(self):
+        activations = np.array([[1,2,1,2], 
+                                [3,4,1,2], 
+                                [2,1,1,1], 
+                                [3,3,1,1]])
+        
+        weights = np.array([[4,3,1,1], 
+                            [2,1,1,1], 
+                            [2,3,1,2], 
+                            [2,3,2,1]])
+        bias = np.array([1,1,1,1])
+        zp = np.array([-1,-1,-1,-1])
+        qsf = np.array([2,2,2,2])
+        
+        instructions = [
+
+            (self.load_bias, (np.array([[1],[1]]),)),        
+            (self.load_zp, (np.array([[-1],[-1]]),)), 
+            (self.load_qsf, (np.array([[2],[2]]),)),   
+
+            # Compute Out tile 1,1
+            (self.gmem2smem, (np.array([[1,2],[3,4]]), 0)), # A tile 1,1
+            (self.gmem2smem, (np.array([[1,2],[1,2]]), 1)), # A tile 1,2
+            (self.load_weights, (np.array([[4,3],[2,1]]),)), # W tile 1,1
+            (self.do_matmul, (0, True, None)),
+            (self.load_weights, (np.array([[2,3],[2,3]]),)), # W tile 2,1
+            (self.do_matmul, (1, False, 11)) ,
+
+            # Compute Out tile 1,2
+            # (self.gmem2smem, (np.array([[1,2],[3,4]]), 0)), # A tile 1,1
+            # (self.gmem2smem, (np.array([[1,2],[1,2]]), 1)), # A tile 1,2
+            (self.load_weights, (np.array([[1,1],[1,1]]),)), # W tile 1,2
+            (self.do_matmul, (0, True, None)),
+            (self.load_weights, (np.array([[1,2],[2,1]]),)), # W tile 2,2
+            (self.do_matmul, (1, False, 12)) ,
+
+            (self.load_bias, (np.array([[1],[1]]),)),        
+            (self.load_zp, (np.array([[-1],[-1]]),)), 
+            (self.load_qsf, (np.array([[2],[2]]),)), 
+
+            # Compute Out tile 2,1
+            (self.gmem2smem, (np.array([[2,1],[3,3]]), 2)), # A tile 2,1
+            (self.gmem2smem, (np.array([[1,1],[1,1]]), 3)), # A tile 2,2
+            (self.load_weights, (np.array([[4,3],[2,1]]),)), # W tile 1,1
+            (self.do_matmul, (2, True, None)),
+            (self.load_weights, (np.array([[2,3],[2,3]]),)), # W tile 2,1
+            (self.do_matmul, (3, False, 21)) ,
+          
+            # Compute Out tile 2,2
+            # (self.gmem2smem, (np.array([[2,1],[3,3]]), 2)), # A tile 2,1
+            # (self.gmem2smem, (np.array([[1,1],[1,1]]), 3)), # A tile 2,2
+            (self.load_weights, (np.array([[1,1],[1,1]]),)), # W tile 1,2
+            (self.do_matmul, (2, True, None)),
+            (self.load_weights, (np.array([[1,2],[2,1]]),)), # W tile 2,2
+            (self.do_matmul, (3, False, 22))  ,               
+        ]
+
+        for (func, args) in instructions:
+            func(*args)
+
+        print(self.on_chip)
+
+        print("Correct")
+
+        res = (np.matmul(activations, weights) + bias)
+        relu = np.maximum(0, res)
+        
+        final = (relu - zp) * qsf
+        print(final)
 
 t = TPU_Compute_Unit()
-t.basic_correctness_test()
-t.sim(None)
+t.sim()
+# t.basic_correctness_test()
+# t.sim(None)
 
 
         # expected_output = np.load('expected_output.npz')['arr_0']
