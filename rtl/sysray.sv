@@ -1,160 +1,99 @@
 `timescale 1ns/1ps
 
 module sysray #(
-    parameter int N = 2;
+    parameter int N       = 2,   
+    parameter int DATA_W  = 16,  
+    parameter int PSUM_W  = 32  
 )(
-    input logic clk,
-    input logic rst,
+    input  logic                   clk,
+    input  logic                   rst,
 
-    input logic [15:0] sysdata_i [N],
-    input logic [15:0] sysweight_i [N],
-    
-    input logic [N:0] in_valid_input,
-    input logic [N:0] in_valid_weight,
+    input  logic [DATA_W-1:0]      sysdata_i   [N],
 
-    output logic [N-1:0] out_valid_weight,
-    output logic [N-1:0] out_valid_input
+    input  logic [DATA_W-1:0]      sysweight_i [N],
+
+    input  logic [N-1:0]           in_valid_input,   
+    input  logic [N-1:0]           in_valid_weight,  
+
+    output logic [N-1:0]           out_valid_input,  
+    output logic [N-1:0]           out_valid_weight  
 );
 
-logic input_valid [N][N];
-logic weight_valid [N][N];
+    logic [DATA_W-1:0]  pe_input_data   [N][N];
+    logic [DATA_W-1:0]  pe_weight_data  [N][N];
+    logic [PSUM_W-1:0]  pe_psum         [N][N];
 
-genvar i, j;
-generate
-    for (i = 0; i < N; i++) begin : ROW
-        for (j = 0; j < N; j++) begin : COLUMN 
+    logic               input_valid     [N][N];
+    logic               weight_valid    [N][N];
 
-        //Valid Signal Logic
-        logic pe_input_valid_i;
-        if (j == 0) begin
-            assign pe_input_valid_i 
-        end else begin
-            assign pe_input_valid_i = input_valid[i][j-1]
+    genvar i, j;
+    generate
+        for (i = 0; i < N; i++) begin : ROW
+            for (j = 0; j < N; j++) begin : COLUMN
+
+                logic [DATA_W-1:0]  pe_input_i;
+                logic [DATA_W-1:0]  pe_weight_i;
+                logic [PSUM_W-1:0]  pe_psum_i;
+                logic               pe_input_valid_i;
+                logic               pe_weight_valid_i;
+
+                if (j == 0) begin
+                    assign pe_input_i       = sysdata_i[i];
+                    assign pe_input_valid_i = in_valid_input[i];
+                end
+                else begin
+                    assign pe_input_i       = pe_input_data[i][j-1];
+                    assign pe_input_valid_i = input_valid[i][j-1];
+                end
+
+                if (i == 0) begin
+                    assign pe_weight_i       = sysweight_i[j];
+                    assign pe_weight_valid_i = in_valid_weight[j];
+                end
+                else begin
+                    assign pe_weight_i       = pe_weight_data[i-1][j];
+                    assign pe_weight_valid_i = weight_valid[i-1][j];
+                end
+
+                if (i == 0) begin
+                    assign pe_psum_i = '0;  
+                end
+                else begin
+                    assign pe_psum_i = pe_psum[i-1][j];
+                end
+
+                pe #(
+                    .DATA_W (DATA_W),
+                    .PSUM_W (PSUM_W)
+                ) u_pe (
+                    .clk_i             (clk),
+                    .rst_i             (rst),
+
+                    .pe_input_i        (pe_input_i),
+                    .pe_weight_i       (pe_weight_i),
+                    .pe_input_valid_i  (pe_input_valid_i),
+                    .pe_weight_valid_i (pe_weight_valid_i),
+                    .pe_psum_i         (pe_psum_i),
+
+                    .pe_input_o        (pe_input_data[i][j]),
+                    .pe_weight_o       (pe_weight_data[i][j]),
+                    .pe_input_valid_o  (input_valid[i][j]),
+                    .pe_weight_valid_o (weight_valid[i][j]),
+                    .pe_psum_o         (pe_psum[i][j])
+                );
+
+            end
+        end
+    endgenerate
+
+    generate
+        for (i = 0; i < N; i++) begin : 
+            assign out_valid_input[i] = input_valid[i][N-1];
         end
 
-        logic pe_weight_valid_i;
-        if (i == 0) begin
-            assign pe_weight_i = 
-        end else begin
-            assign pe_weight_valid_i = weight_valid[i-1][j]
+        for (j = 0; j < N; j++) begin : 
+            assign out_valid_weight[j] = weight_valid[N-1][j];
         end
-
-        //Partial Sum Logic
-        logic pe_psum_i, pe_psum_o;
-        if (i = 0) begin
-            assign pe_psum_i = 16'b0;
-        end else begin
-            assign pe_sum_o[i][j] = pe_psum_i;
-        end 
-
-        pe pe (
-            .clk_i(clk);
-            .rst_i(rst);
-            .pe_psum_i();
-            .pe_weight_i();
-            .pe_weight_valid_i(pe_weight_valid_i);
-            .pe_input_i();
-            .pe_input_valid_i(pe_input_valid_i);
-            .pe_psum_o();
-            .pe_weight_o();
-            .pe_weight_valid_o(weight_valid[i][j]);
-            .pe_input_o();
-            .pe_input_valid_o(input_valid[i][j]);
-        )
-
-        end
-    end
-endgenerate
-
-endmodule
-
-//     input logic [15:0] sysdata11_i,
-//     input logic [15:0] sysdata12_i,
-    
-//     input logic [15:0] sysweight11_i,
-//     input logic [15:0] sysweight12_i,
-
-//     //
-//     input logic [1:0] in_valid_input,
-//     output logic [1:0] out_valid_input,
-
-//     input logic [1:0] in_valid_weight,
-//     output logic [1:0] out_valid_weight
-// )
-//     logic pe11_input_valid_o, pe11_weight_valid_o;
-//     //input for pe12, weight for pe21
-//     logic pe12_input_vasysweight11_ilid_o, pe12_weight_valid_o;
-//     //weight for pe 22
-//     logic pe21_input_valid_o, pe21_weight_valid_o;
-//     //input for pe 22, weight for column 1 bias
-//     logic pe22_input_valid_o, pe22_weight_valid_o;
-//     //weight for column 2 bias
-
-    // pe pe11 (
-    //     .clk_i(clk);
-    //     .rst_i(rst);
-    //     .pe_psum_i('0);
-    //     .pe_weight_i();
-    //     .pe_weight_valid_i(in_valid_weight[0]);
-    //     .pe_input_i();
-    //     .pe_input_valid_i(in_valid_input[0]);
-    //     .pe_psum_o();
-    //     .pe_weight_o();
-    //     .pe_weight_valid_o(pe11_input_valid_o);
-    //     .pe_input_o();
-    //     .pe_input_valid_o(pe11_weight_valid_o);
-    // )
-
-//     pe pe12 (
-//         .clk_i(clk);
-//         .rst_i(rst);
-//         .pe_psum_i('0);
-//         .pe_weight_i();
-//         .pe_weight_valid_i(in_valid_weight[1]);
-//         .pe_input_i();
-//         .pe_input_valid_i(pe11_input_valid_o);
-//         .pe_psum_o();
-//         .pe_weight_o();
-//         .pe_weight_valid_o(pe12_weight_valid_o);
-//         .pe_input_o();
-//         .pe_input_valid_o(pe12_input_valid_o);
-//     )
-
-//     pe pe21 (
-//         .clk_i(clk);
-//         .rst_i(rst);
-//         .pe_psum_i();
-//         .pe_weight_i();
-//         .pe_weight_valid_i(pe11_weight_valid_o);
-//         .pe_input_i();
-//         .pe_input_valid_i(in_valid_input[1]);
-//         .pe_psum_o();
-//         .pe_weight_o();
-//         .pe_weight_valid_o(pe21_weight_valid_o);
-//         .pe_input_o();
-//         .pe_input_valid_o(pe21_input_valid_o);
-//     )
-
-//     pe pe22 (
-//         .clk_i(clk);
-//         .rst_i(rst);
-//         .pe_psum_i();
-//         .pe_weight_i();
-//         .pe_weight_valid_i(pe12_weight_valid_o);
-//         .pe_input_i();
-//         .pe_input_valid_i(pe21_input_valid_o);
-//         .pe_psum_o();
-//         .pe_weight_o();
-//         .pe_weight_valid_o(pe22_weight_valid_o);
-//         .pe_input_o();
-//         .pe_input_valid_o(pe22_input_valid_o);
-//     )
-
-
-//     assign out_valid_input[0] = pe12_input_valid_o;
-//     assign out_valid_input[1] = pe22_input_valid_o;
-
-//     assign out_valid_weight[0] = pe21_weight_valid_o;
-//     assign out_valid_weight[1] = pe22_weight_valid_o;
+    endgenerate
 
 endmodule
