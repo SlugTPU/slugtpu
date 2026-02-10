@@ -1,3 +1,7 @@
+/* SPI Mode 0 Slave */
+
+// NOTE: NOT Safe! Two different clks => metastability issue
+
 module spi_slave (
     input  wire clk,
     input  wire rst,
