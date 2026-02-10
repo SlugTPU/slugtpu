@@ -10,18 +10,18 @@ module spi_slave (
     input  wire cs_n,
     output wire miso,
 
-    output reg  [7:0] rx_data,
-    output reg        rx_valid,
+    output logic  [7:0] rx_data,
+    output logic        rx_valid,
 
     input  wire [7:0] tx_data,
     input  wire       tx_valid
 );
 
-    reg [7:0] shift_rx;
-    reg [7:0] shift_tx;
-    reg [2:0] bit_cnt;
+    logic [7:0] shift_rx;
+    logic [7:0] shift_tx;
+    logic [2:0] bit_cnt;
 
-    reg sclk_d;
+    logic sclk_d;
     wire sclk_rise;
 
     assign sclk_rise = (sclk == 1'b1) && (sclk_d == 1'b0);
