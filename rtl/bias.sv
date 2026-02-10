@@ -1,5 +1,3 @@
-`timescale 1ns/1ps
-
 module bias(
     input logic clk_i,
     input logic rst_i,
