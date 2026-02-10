@@ -1,322 +1,503 @@
 """
-Memory hierarchy and double buffering.
-  OFF-CHIP (DRAM): Large, slow (80+ cycles)
-  ON-CHIP (SRAM): Small, fast (1 cycle), double-buffered
+TPU Memory Model - (Transaction Level with Wishbone)
 
-Current idea:
-
-OFF-CHIP:
-- Full model weights
-- Large activation tensors
-    
-ON-CHIP:
-- Weight Buffer (double-buffered for prefetch)
-- Activation Buffer (input to systolic array)
-- Accumulator Buffer (output from systolic array)
-
+Wishbone Addressing (32-bit bus, byte-addressable, little-endian):
+  Address 0x100 = bytes [0x100, 0x101, 0x102, 0x103]
+  Write 0xDEADBEEF to 0x100:
+    0x100 <- 0xEF (byte 0, bits 7:0)
+    0x101 <- 0xBE (byte 1, bits 15:8)
+    0x102 <- 0xAD (byte 2, bits 23:16)
+    0x103 <- 0xDE (byte 3, bits 31:24)
+  
+  sel=0xF: all 4 bytes, sel=0x1: byte 0 only, sel=0x5: bytes 0 and 2
 """
 
-import numpy as np
+from collections import deque
 from dataclasses import dataclass
 
-@dataclass
-class Config:
-    array_size: int = 8 # 8x8 systolic array
-    
-    # buffer size in bytes
-    weight_buffer_size: int = 2 * 1024 # 2KB per buffer (x2 for double buffering)
-    activation_buffer_size: int = 2 * 1024
-    accumulator_buffer_size: int = 4 * 1024 
-    
-    # timing (cycles)
-    sram_latency: int = 1
-    dram_latency: int = 80
-    dma_setup_cycles: int = 10
 
-
-#stats
+# WISHBONE
 
 @dataclass
-class Stats:
-    total_cycles: int = 0
-    compute_cycles: int = 0
-    stall_cycles: int = 0
-    dma_transfers: int = 0
-    buffer_switches: int = 0
-    dram_bytes_read: int = 0
-    dram_bytes_written: int = 0
-    
-    def efficiency(self) -> float:
-        if self.total_cycles == 0:
-            return 0.0
-        return self.compute_cycles / self.total_cycles
-    
-    def print(self):
-        print("\n" + "=" * 50)
-        print("The Holy Mem Stats")
-        print("=" * 50)
-        print(f"Total cycles: {self.total_cycles}")
-        print(f"  Compute: {self.compute_cycles}")
-        print(f"  Stalls: {self.stall_cycles}")
-        print(f"Efficiency: {self.efficiency():.1%}")
-        print(f"DMA transfers: {self.dma_transfers}")
-        print(f"Buffer switches: {self.buffer_switches}")
-        print(f"DRAM bytes read: {self.dram_bytes_read}")
-        print(f"DRAM bytes written: {self.dram_bytes_written}")
-        print("=" * 50)
+class WishboneTransaction:
+    """Wishbone bus transaction container."""
+    addr: int
+    data: int = 0
+    we: bool = False      # True=write, False=read
+    sel: int = 0xF        # Byte select (0xF = all 4 bytes)
 
 
-# DRAM
-
-class DRAM:
-    def __init__(self, cfg: Config):
-        self.cfg = cfg
-        self._mem = {}  # sparse storage: addr -> byte
-        self._current_row = -1
-        self._row_size = 8192  # 8KB rows
+class WishboneMemory:
+    """Memory with Wishbone interface. 32-bit data bus, byte-addressable."""
     
-    def read(self, addr: int, size: int) -> tuple[bytes, int]: #Read data. return (data, latency_cycles).
-        row = addr // self._row_size
-        
-        if row == self._current_row:
-            latency = 10 + (size // 64)
-        else:
-            self._current_row = row
-            latency = self.cfg.dram_latency + (size // 64)
-        
-        data = bytearray(size)
-        for i in range(size):
-            data[i] = self._mem.get(addr + i, 0)
-        
-        return bytes(data), latency
-    
-    def write(self, addr: int, data: bytes) -> int: # Write data. returns latency_cycles.
-        row = addr // self._row_size
-        
-        if row == self._current_row:
-            latency = 10 + (len(data) // 64)
-        else:
-            self._current_row = row
-            latency = self.cfg.dram_latency + (len(data) // 64)
-        
-        for i, b in enumerate(data):
-            self._mem[addr + i] = b
-        
-        return latency
-
-
-# DOUBLE BUFFER
-
-class DoubleBuffer:
-    """
-    Double-buffered SRAM scratchpad.
-    
-    - Buffer A: active (systolic array reads from this)
-    - Buffer B: loading (DMA writes here)
-    - Switch: swap A and B
-    """
-    
-    def __init__(self, name: str, size: int):
+    def __init__(self, size_bytes: int, name: str = "Memory"):
         self.name = name
-        self.size = size
-        
-        self._buffers = [bytearray(size), bytearray(size)]
-        self._active = 0   # active buffer index
-        self._loading = 1  # loading buffer index
-        
-        # DMA state
-        self._dma_running = False
-        self._dma_cycles_left = 0
-        self._dma_data = None
-        self._dma_offset = 0
+        self.size = size_bytes
+        self._mem = bytearray(size_bytes)
     
-    # r/w for systolic array
+    def execute(self, txn: WishboneTransaction) -> int:
+        """Execute transaction. Returns read data (0 for writes)."""
+        if txn.we:
+            for i in range(4):
+                if txn.sel & (1 << i):
+                    addr = txn.addr + i
+                    if addr < self.size:
+                        self._mem[addr] = (txn.data >> (i * 8)) & 0xFF
+            return 0
+        else:
+            data = 0
+            for i in range(4):
+                addr = txn.addr + i
+                if addr < self.size:
+                    data |= self._mem[addr] << (i * 8)
+            return data
     
-    def read(self, offset: int, size: int) -> bytes:
-        # r active buffer
-        buf = self._buffers[self._active]
-        return bytes(buf[offset:offset + size])
+    def read_bytes(self, addr: int, n_bytes: int) -> bytes:
+        """Read n bytes via Wishbone transactions."""
+        result = bytearray()
+        for offset in range(0, n_bytes, 4):
+            txn = WishboneTransaction(addr=addr + offset, we=False)
+            word = self.execute(txn)
+            for i in range(min(4, n_bytes - offset)):
+                result.append((word >> (i * 8)) & 0xFF)
+        return bytes(result)
     
-    def write(self, offset: int, data: bytes):
-        # w active buffer
-        buf = self._buffers[self._active]
-        buf[offset:offset + len(data)] = data
+    def write_bytes(self, addr: int, data: bytes):
+        """Write bytes via Wishbone transactions."""
+        for offset in range(0, len(data), 4):
+            chunk = data[offset:offset + 4]
+            word = 0
+            sel = 0
+            for i, b in enumerate(chunk):
+                word |= b << (i * 8)
+                sel |= 1 << i
+            txn = WishboneTransaction(addr=addr + offset, data=word, we=True, sel=sel)
+            self.execute(txn)
+
+
+# FIFO & OUTPUT BUFFER
+
+class FIFO:
+    """8-bit FIFO for weights."""
     
-    # DMA ops: This part of code was influenced by an AI model ;-; let me know if there are any inconsistencies or something off
+    def __init__(self, name: str = "FIFO"):
+        self.name = name
+        self._queue: deque = deque()
     
-    def start_dma(self, data: bytes, offset: int, cycles: int):
-        """Start loading data into loading buffer (background)."""
-        if self._dma_running:
-            raise RuntimeError(f"{self.name}: DMA already running")
-        
-        self._dma_running = True
-        self._dma_cycles_left = cycles
-        self._dma_data = data
-        self._dma_offset = offset
+    def push(self, val: int):
+        self._queue.append(val & 0xFF)
     
-    def tick(self) -> bool:
-        """Advance one cycle. Returns True if DMA just completed."""
-        if not self._dma_running:
-            return False
-        
-        self._dma_cycles_left -= 1
-        
-        if self._dma_cycles_left <= 0:
-            # Transfer complete
-            buf = self._buffers[self._loading]
-            buf[self._dma_offset:self._dma_offset + len(self._dma_data)] = self._dma_data
-            self._dma_running = False
-            self._dma_data = None
-            return True
-        
-        return False
+    def push_bytes(self, data: bytes):
+        for b in data:
+            self._queue.append(b)
+    
+    def pop(self) -> int:
+        """Returns 0 if empty."""
+        return self._queue.popleft() if self._queue else 0
     
     @property
-    def dma_running(self) -> bool:
-        return self._dma_running
+    def empty(self) -> bool:
+        return len(self._queue) == 0
     
     @property
-    def dma_cycles_remaining(self) -> int:
-        return self._dma_cycles_left if self._dma_running else 0
-    
-    # buffer switching
-    
-    def can_switch(self) -> bool:
-        return not self._dma_running
-    
-    def switch(self):
-        # swap active and loading buffers
-        if self._dma_running:
-            raise RuntimeError(f"{self.name}: Cannot switch during DMA")
-        self._active, self._loading = self._loading, self._active
-
-
-class SingleBuffer:
-    #single buffer for accumulator
-    
-    def __init__(self, name: str, size: int):
-        self.name = name
-        self.size = size
-        self._buf = bytearray(size)
-    
-    def read(self, offset: int, size: int) -> bytes:
-        return bytes(self._buf[offset:offset + size])
-    
-    def write(self, offset: int, data: bytes):
-        self._buf[offset:offset + len(data)] = data
+    def count(self) -> int:
+        return len(self._queue)
     
     def clear(self):
-        self._buf = bytearray(self.size)
+        self._queue.clear()
+    
+    def to_list(self) -> list[int]:
+        return list(self._queue)
 
-class TPUMemory:
-# whole thing put together. this should handle the main interface the tpu will use. will use DMRAM, double buff SRAM, and DMA    
-    def __init__(self, cfg: Config = None):
-        self.cfg = cfg or Config()
-        
-        self.dram = DRAM(self.cfg)
-        self.weight_buf = DoubleBuffer("WeightBuffer", self.cfg.weight_buffer_size)
-        self.activation_buf = DoubleBuffer("ActivationBuffer", self.cfg.activation_buffer_size)
-        self.accumulator = SingleBuffer("Accumulator", self.cfg.accumulator_buffer_size)
-        
-        self._cycle = 0
-        self.stats = Stats()
+
+class OutputBuffer:
+    """Collects 8-bit outputs from systolic array."""
     
-    # setup before tpu run
+    def __init__(self):
+        self._data: list[int] = []
     
-    def host_write_dram(self, addr: int, data: bytes):
-        # host CPU writes data to DRAM
-        latency = self.dram.write(addr, data)
-        self.stats.dram_bytes_written += len(data)
-        # don't count toward TPU cycles
+    def push(self, high_byte: int, low_byte: int):
+        self._data.append(high_byte & 0xFF)
+        self._data.append(low_byte & 0xFF)
     
-    def host_read_dram(self, addr: int, size: int) -> bytes:
-        # host CPU reads data from DRAM
-        data, _ = self.dram.read(addr, size)
-        return data
+    def push_byte(self, val: int):
+        self._data.append(val & 0xFF)
     
-    # DMA operations (background transfers). Again, AI helped with a lot of this section (and other DMA related stuff). It seems fine in testing, but if there are any issues let me know!
+    def get_all(self) -> bytes:
+        return bytes(self._data)
     
-    def dma_load_weights(self, dram_addr: int, size: int, buf_offset: int = 0):
-        """Start DMA: DRAM -> Weight Buffer (loading side)."""
-        data, latency = self.dram.read(dram_addr, size)
-        total_cycles = self.cfg.dma_setup_cycles + latency
-        
-        self.weight_buf.start_dma(data, buf_offset, total_cycles)
-        self.stats.dma_transfers += 1
-        self.stats.dram_bytes_read += size
-    
-    def dma_load_activations(self, dram_addr: int, size: int, buf_offset: int = 0):
-        """Start DMA: DRAM -> Activation Buffer (loading side)."""
-        data, latency = self.dram.read(dram_addr, size)
-        total_cycles = self.cfg.dma_setup_cycles + latency
-        
-        self.activation_buf.start_dma(data, buf_offset, total_cycles)
-        self.stats.dma_transfers += 1
-        self.stats.dram_bytes_read += size
-    
-    def dma_store_outputs(self, dram_addr: int, buf_offset: int, size: int):
-        """Transfer accumulator -> DRAM (blocking)."""
-        data = self.accumulator.read(buf_offset, size)
-        latency = self.dram.write(dram_addr, data)
-        
-        self._cycle += latency
-        self.stats.total_cycles += latency
-        self.stats.stall_cycles += latency
-        self.stats.dma_transfers += 1
-        self.stats.dram_bytes_written += size
-    
-    # buffer access for systolic array
-    
-    def read_weights(self, offset: int, size: int) -> bytes:
-        return self.weight_buf.read(offset, size)
-    
-    def read_activations(self, offset: int, size: int) -> bytes:
-        return self.activation_buf.read(offset, size)
-    
-    def write_accumulator(self, offset: int, data: bytes):
-        self.accumulator.write(offset, data)
-    
-    def read_accumulator(self, offset: int, size: int) -> bytes:
-        return self.accumulator.read(offset, size)
-    
-    # timing and control
-    
-    def tick(self, cycles: int = 1):
-        for _ in range(cycles):
-            self._cycle += 1
-            self.stats.total_cycles += 1
-            self.weight_buf.tick()
-            self.activation_buf.tick()
-    
-    def wait_for_weights(self) -> int:
-        stalls = 0
-        while self.weight_buf.dma_running:
-            self.tick()
-            stalls += 1
-            self.stats.stall_cycles += 1
-        return stalls
-    
-    def wait_for_activations(self) -> int:
-        stalls = 0
-        while self.activation_buf.dma_running:
-            self.tick()
-            stalls += 1
-            self.stats.stall_cycles += 1
-        return stalls
-    
-    def switch_weight_buffer(self):
-        self.weight_buf.switch()
-        self.stats.buffer_switches += 1
-    
-    def switch_activation_buffer(self):
-        self.activation_buf.switch()
-        self.stats.buffer_switches += 1
-    
-    def compute(self, cycles: int):
-        for _ in range(cycles):
-            self.tick()
-            self.stats.compute_cycles += 1
+    def clear(self):
+        self._data.clear()
     
     @property
-    def cycle(self) -> int:
-        return self._cycle
+    def count(self) -> int:
+        return len(self._data)
+
+
+# TPU MEMORY SYSTEM
+
+class TPUMemory:
+    """    
+     LiteDRAM exposes wishbone interface
+     Weights loaded from off-chip
+     output_buf collects systolic array outputs
+    """
+    
+    def __init__(self, offchip_size: int = 1024 * 1024):
+        self.off_chip = WishboneMemory(offchip_size, "OffChipDRAM")
+        self.weight_fifo = FIFO("WeightFIFO")
+        self.output_buf = OutputBuffer()
+    
+    # off->on via wishbone
+    
+    def load_weights(self, addr: int, n_bytes: int):
+        """Load weights from off-chip DRAM into weight FIFO."""
+        data = self.off_chip.read_bytes(addr, n_bytes)
+        self.weight_fifo.push_bytes(data)
+    
+    def read_activations(self, addr: int, n_bytes: int) -> bytes:
+        """Read activations from off-chip (streamed directly, no FIFO)."""
+        return self.off_chip.read_bytes(addr, n_bytes)
+    
+    #on -> off via wishbone
+    
+    def store_to_offchip(self, addr: int, data: bytes):
+        self.off_chip.write_bytes(addr, data)
+    
+    def store_outputs_to_offchip(self, addr: int):
+        self.off_chip.write_bytes(addr, self.output_buf.get_all())
+        self.output_buf.clear()
+    
+    # raw wishbone access
+    
+    def wishbone_read(self, addr: int) -> int:
+        return self.off_chip.execute(WishboneTransaction(addr=addr, we=False))
+    
+    def wishbone_write(self, addr: int, data: int, sel: int = 0xF):
+        self.off_chip.execute(WishboneTransaction(addr=addr, data=data, we=True, sel=sel))
+    
+    #  Interface Systolic Array 
+    
+    def get_weight(self) -> int:
+        """Pop next weight from FIFO (8-bit)."""
+        return self.weight_fifo.pop()
+    
+    def push_output(self, high: int, low: int):
+        """Push 16-bit result as two 8-bit values."""
+        self.output_buf.push(high, low)
+    
+    def push_output_byte(self, val: int):
+        self.output_buf.push_byte(val)
+    
+    def print_status(self):
+        print(f"Weight FIFO: {self.weight_fifo.count} bytes")
+        print(f"Output Buffer: {self.output_buf.count} bytes")
+
+
+# TESTBENCH
+
+class TestResult:
+    def __init__(self):
+        self.passed = 0
+        self.failed = 0
+        self.errors = []
+    
+    def check(self, condition: bool, msg: str):
+        if condition:
+            self.passed += 1
+        else:
+            self.failed += 1
+            self.errors.append(msg)
+    
+    def check_equal(self, actual, expected, msg: str):
+        if actual == expected:
+            self.passed += 1
+        else:
+            self.failed += 1
+            self.errors.append(f"{msg}: expected {expected}, got {actual}")
+    
+    def summary(self) -> str:
+        status = "PASS" if self.failed == 0 else "FAIL"
+        s = f"[{status}] {self.passed} passed, {self.failed} failed"
+        for err in self.errors:
+            s += f"\n  ERROR: {err}"
+        return s
+
+
+def test_wishbone_read_write():
+    """Verify read returns what was written."""
+    result = TestResult()
+    mem = TPUMemory()
+    
+    test_cases = [
+        (0x000, 0x00000000),
+        (0x100, 0xDEADBEEF),
+        (0x200, 0x12345678),
+        (0x300, 0xFFFFFFFF),
+    ]
+    
+    for addr, data in test_cases:
+        mem.wishbone_write(addr, data)
+        readback = mem.wishbone_read(addr)
+        result.check_equal(readback, data, f"Addr 0x{addr:03X}")
+    
+    # Verify no address bleed
+    mem.wishbone_write(0x500, 0xAAAAAAAA)
+    mem.wishbone_write(0x504, 0xBBBBBBBB)
+    result.check_equal(mem.wishbone_read(0x500), 0xAAAAAAAA, "No bleed 0x500")
+    result.check_equal(mem.wishbone_read(0x504), 0xBBBBBBBB, "No bleed 0x504")
+    
+    print(f"test_wishbone_read_write: {result.summary()}")
+    return result
+
+
+def test_wishbone_byte_select():
+    """Verify byte select only modifies selected bytes."""
+    result = TestResult()
+    mem = TPUMemory()
+    
+    mem.wishbone_write(0x100, 0x00000000, sel=0xF)
+    
+    # write each byte individually, verify others unchanged
+    mem.wishbone_write(0x100, 0x000000AA, sel=0x1)
+    result.check_equal(mem.wishbone_read(0x100), 0x000000AA, "sel=0x1")
+    
+    mem.wishbone_write(0x100, 0x0000BB00, sel=0x2)
+    result.check_equal(mem.wishbone_read(0x100), 0x0000BBAA, "sel=0x2")
+    
+    mem.wishbone_write(0x100, 0x00CC0000, sel=0x4)
+    result.check_equal(mem.wishbone_read(0x100), 0x00CCBBAA, "sel=0x4")
+    
+    mem.wishbone_write(0x100, 0xDD000000, sel=0x8)
+    result.check_equal(mem.wishbone_read(0x100), 0xDDCCBBAA, "sel=0x8")
+    
+    # Non-contiguous: bytes 0 and 2 only
+    mem.wishbone_write(0x200, 0xFFFFFFFF, sel=0xF)
+    mem.wishbone_write(0x200, 0x00110022, sel=0x5)
+    result.check_equal(mem.wishbone_read(0x200), 0xFF11FF22, "sel=0x5")
+    
+    print(f"test_wishbone_byte_select: {result.summary()}")
+    return result
+
+
+def test_fifo_ordering():
+    """Verify weight FIFO maintains first-in-first-out order."""
+    result = TestResult()
+    mem = TPUMemory()
+    
+    test_data = bytes([10, 20, 30, 40, 50, 60, 70, 80])
+    mem.off_chip.write_bytes(0x1000, test_data)
+    mem.load_weights(0x1000, 8)
+    
+    for i, expected in enumerate(test_data):
+        actual = mem.get_weight()
+        result.check_equal(actual, expected, f"FIFO index {i}")
+    
+    result.check(mem.weight_fifo.empty, "FIFO empty after drain")
+    
+    print(f"test_fifo_ordering: {result.summary()}")
+    return result
+
+
+def test_activation_streaming():
+    """Verify activations read directly from off-chip (no FIFO)."""
+    result = TestResult()
+    mem = TPUMemory()
+    
+    test_data = bytes([1, 2, 3, 4, 5, 6, 7, 8])
+    mem.off_chip.write_bytes(0x2000, test_data)
+    
+    # Read activations directly
+    acts = mem.read_activations(0x2000, 8)
+    result.check_equal(list(acts), list(test_data), "Direct activation read")
+    
+    # Can read same data again (not consumed like FIFO)
+    acts2 = mem.read_activations(0x2000, 8)
+    result.check_equal(list(acts2), list(test_data), "Re-read activations")
+    
+    print(f"test_activation_streaming: {result.summary()}")
+    return result
+
+
+def test_load_various_sizes():
+    """Verify non-aligned byte counts work correctly."""
+    result = TestResult()
+    mem = TPUMemory()
+    
+    for n_bytes in [1, 2, 3, 4, 5, 7, 8, 9, 15, 16, 17]:
+        mem.weight_fifo.clear()
+        test_data = bytes([i & 0xFF for i in range(n_bytes)])
+        mem.off_chip.write_bytes(0x0000, test_data)
+        mem.load_weights(0x0000, n_bytes)
+        
+        result.check_equal(mem.weight_fifo.count, n_bytes, f"Load {n_bytes} count")
+        result.check_equal(mem.weight_fifo.to_list(), list(test_data), f"Load {n_bytes} data")
+    
+    print(f"test_load_various_sizes: {result.summary()}")
+    return result
+
+
+def test_output_buffer():
+    """Verify high/low byte storage and reconstruction."""
+    result = TestResult()
+    mem = TPUMemory()
+    
+    test_values = [0x0000, 0x00FF, 0xFF00, 0xFFFF, 0x1234, 0xABCD]
+    
+    for val in test_values:
+        mem.push_output((val >> 8) & 0xFF, val & 0xFF)
+    
+    output = mem.output_buf.get_all()
+    result.check_equal(len(output), len(test_values) * 2, "Output byte count")
+    
+    for i, expected in enumerate(test_values):
+        actual = (output[i * 2] << 8) | output[i * 2 + 1]
+        result.check_equal(actual, expected, f"Output value {i}")
+    
+    print(f"test_output_buffer: {result.summary()}")
+    return result
+
+
+def test_store_to_offchip():
+    """Verify round-trip storage to off-chip."""
+    result = TestResult()
+    mem = TPUMemory()
+    
+    outputs = [(0x00, 0x01), (0x00, 0x02), (0x12, 0x34), (0xAB, 0xCD)]
+    for high, low in outputs:
+        mem.push_output(high, low)
+    
+    mem.store_outputs_to_offchip(0x5000)
+    
+    result.check_equal(mem.output_buf.count, 0, "Buffer cleared")
+    
+    stored = mem.off_chip.read_bytes(0x5000, 8)
+    expected = bytes([0x00, 0x01, 0x00, 0x02, 0x12, 0x34, 0xAB, 0xCD])
+    result.check_equal(stored, expected, "Stored data")
+    
+    print(f"test_store_to_offchip: {result.summary()}")
+    return result
+
+
+def test_matmul_8x8():
+    """Functional test: 8x8 matrix multiply with known values."""
+    result = TestResult()
+    mem = TPUMemory()
+    
+    # W[i][j] = i + j, A[j] = j + 1
+    weights = bytes([(i + j) & 0xFF for i in range(8) for j in range(8)])
+    activations = bytes([1, 2, 3, 4, 5, 6, 7, 8])
+    
+    mem.off_chip.write_bytes(0x0000, weights)
+    mem.off_chip.write_bytes(0x1000, activations)
+    
+    mem.load_weights(0x0000, 64)
+    result.check_equal(mem.weight_fifo.count, 64, "Weights loaded")
+    
+    # Expected: Output[i] = sum((i + j) * (j + 1) for j in 0..7)
+    expected_outputs = []
+    for i in range(8):
+        acc = sum((i + j) * (j + 1) for j in range(8))
+        expected_outputs.append(acc)
+    
+    # Compute: weights from FIFO, activations streamed directly
+    computed_outputs = []
+    for i in range(8):
+        acc = 0
+        acts = mem.read_activations(0x1000, 8)  # Stream activations each row
+        
+        for j in range(8):
+            w = mem.get_weight()
+            a = acts[j]
+            acc += w * a
+        
+        computed_outputs.append(acc)
+        mem.push_output((acc >> 8) & 0xFF, acc & 0xFF)
+    
+    for i in range(8):
+        result.check_equal(computed_outputs[i], expected_outputs[i], f"Output[{i}]")
+    
+    # Verify round-trip storage
+    mem.store_outputs_to_offchip(0x2000)
+    stored = mem.off_chip.read_bytes(0x2000, 16)
+    
+    for i in range(8):
+        val = (stored[i * 2] << 8) | stored[i * 2 + 1]
+        result.check_equal(val, expected_outputs[i], f"Stored[{i}]")
+    
+    print(f"test_matmul_8x8: {result.summary()}")
+    return result
+
+
+def test_multiple_transactions():
+    """Verify sequential load-compute-store cycles."""
+    result = TestResult()
+    mem = TPUMemory()
+    
+    for cycle in range(3):
+        offset = cycle * 0x1000
+        
+        weights = bytes([(i + cycle * 10) & 0xFF for i in range(8)])
+        acts = bytes([i + 1 for i in range(8)])
+        
+        mem.off_chip.write_bytes(offset, weights)
+        mem.off_chip.write_bytes(offset + 0x100, acts)
+        
+        mem.weight_fifo.clear()
+        mem.load_weights(offset, 8)
+        
+        streamed_acts = mem.read_activations(offset + 0x100, 8)
+        
+        for j in range(8):
+            w = mem.get_weight()
+            a = streamed_acts[j]
+            res = w * a
+            mem.push_output((res >> 8) & 0xFF, res & 0xFF)
+        
+        mem.store_outputs_to_offchip(offset + 0x200)
+        
+        # Verify first output
+        first_out = mem.off_chip.read_bytes(offset + 0x200, 2)
+        expected = weights[0] * acts[0]
+        actual = (first_out[0] << 8) | first_out[1]
+        result.check_equal(actual, expected, f"Cycle {cycle} first output")
+    
+    print(f"test_multiple_transactions: {result.summary()}")
+    return result
+
+
+def run_all_tests():
+    print("TPU MEMORY FUNCTIONAL TESTBENCH")
+    print("---" "\n")
+    
+    tests = [
+        test_wishbone_read_write,
+        test_wishbone_byte_select,
+        test_fifo_ordering,
+        test_activation_streaming,
+        test_load_various_sizes,
+        test_output_buffer,
+        test_store_to_offchip,
+        test_matmul_8x8,
+        test_multiple_transactions,
+    ]
+    
+    total_passed = 0
+    total_failed = 0
+    
+    for test_fn in tests:
+        r = test_fn()
+        total_passed += r.passed
+        total_failed += r.failed
+        print()
+    
+    if total_failed == 0:
+        print(f"ALL TESTS PASSED! {total_passed} checks")
+    else:
+        print(f"TESTS FAILED :c {total_passed} passed, {total_failed} failed")
+    
+    return total_failed == 0
+
+
+if __name__ == "__main__":
+    run_all_tests()
