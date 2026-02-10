@@ -1,10 +1,10 @@
-export WAVES=1
-export HDL_TOPLEVEL_LANG=verilog
-
 test_fifo:
 	python3 -m pytest sim/test_fifo.py -s
 
-clean:
-	rm -Rf sim_build
+test_spi:
+	python3 -m pytest sim/test_spi.py -s
 
-.PHONY: test_fifo clean
+clean:
+	rm -rf sim_build
+
+.PHONY: test_spi clean
