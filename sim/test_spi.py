@@ -86,8 +86,10 @@ async def spi_write_bytes(dut, data: bytes):
 
 @cocotb.test()
 async def test_00_smoke(dut):
-    cocotb.start_soon(Clock(dut.clk, SYS_CLK_PERIOD_NS, units="ns").start())
-    await reset_dut(dut)
+    clk_i = dut.clk
+    rst_i = dut.rst
+    await clock_start(clk_i)
+    await reset_sequence(clk_i, rst_i)
 
 
 
@@ -99,7 +101,7 @@ def test_spi_each(testcase):
     proj_path = Path("./rtl").resolve()
     sources = [ proj_path/"spi_slave.sv" ]
 
-    run_test(sources=sources, module_name="test_spi", hdl_toplevel="spi_slave", testcase=testcase)
+    run_test(parameters={}, sources=sources, module_name="test_spi", hdl_toplevel="spi_slave", testcase=testcase)
 
 def test_spi_all():
     """Runs each test sequentially as one giant test."""
@@ -109,4 +111,4 @@ def test_spi_all():
     # debug print parameters can be idea if a simulator fails silently without telling you why
     # print(f"DEBUG PARAMETERs: {depth_p}")
 
-    run_test(sources=sources, module_name="test_spi", hdl_toplevel="spi_slave")
+    run_test(parameters={}, sources=sources, module_name="test_spi", hdl_toplevel="spi_slave")
