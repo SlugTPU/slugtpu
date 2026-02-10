@@ -3,20 +3,36 @@ module bias(
     input logic rst_i,
 
     input logic signed[31:0] bias_i,
-    input logic valid_i,
+    input logic bias_valid_i,
+    input logic data_valid_i,
     input logic signed [31:0] data_i,
-    output logic valid_o;
+    output logic data_valid_o,
     output logic signed [31:0] data_o
 );
 
-always @(posedge clk_i) begin
+logic signed [31:0] bias_r;
+logic bias_ready_r;
+
+always_ff @(posedge clk_i) begin
+    if (rst_i) begin
+        bias_r <= '0;
+        bias_ready_r <= '0;
+    end else if (bias_valid_i) begin
+        bias_r <= data_i;
+        bias_ready_r <= '0;
+    end
+end
+
+always_ff @(posedge clk_i) begin
     if (rst_i) begin
         data_o <= 32'b0;
-        valid_o <= 1'b0;
+        data_valid_o <= 1'b0;
     end
-    else if (valid_i) begin 
-        valid_o <= valid_i;
-        data_o <= bias_i + data_i; 
+    else if (data_valid_i && bias_ready_r) begin 
+        data_valid_o <= data_valid_i;
+        data_o <= bias_r + data_i; 
+    end else begin
+        data_valid_o <= '0;
     end
 end
 
