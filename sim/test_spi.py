@@ -11,10 +11,6 @@ import random
 # Mode 0: CPOL=0, CPHA=0
 # IMPORTANT: Drive SCLK/MOSI/CS aligned to clk edges so spi_slave's clk-domain edge detect works.
 
-SYS_CLK_PERIOD_NS = 10
-
-
-
 def u32_to_le_bytes(x: int) -> bytes:
     x &= 0xFFFFFFFF
     return bytes([
@@ -23,13 +19,6 @@ def u32_to_le_bytes(x: int) -> bytes:
         (x >> 16) & 0xFF,
         (x >> 24) & 0xFF,
     ])
-
-
-async def wait_cycles(dut, n: int):
-    for _ in range(n):
-        await RisingEdge(dut.clk)
-
-
 
 async def spi_shift_byte(dut, byte_out: int) -> int:
     """
@@ -83,18 +72,21 @@ async def spi_write_bytes(dut, data: bytes):
     await wait_cycles(dut, SPI_HALF_CYCLES)
 
 
-
 @cocotb.test()
-async def test_00_smoke(dut):
+async def reset_test(dut):
     clk_i = dut.clk
     rst_i = dut.rst
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
     await FallingEdge(rst_i)
 
+@cocotb.test()
+async def simple_test(dut):
+    clk_i = dut.clk
+    rst_i = dut.rst
 
 
-tests = ['test_00_smoke']
+tests = ['reset_test']
 
 @pytest.mark.parametrize("testcase", tests)
 def test_spi_each(testcase):
