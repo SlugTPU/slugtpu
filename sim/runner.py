@@ -35,7 +35,8 @@ def run_test(parameters, sources, module_name, hdl_toplevel, testcase=None):
             timescale=timescale,
             build_dir=build_dir,
             parameters=parameters,
-            build_args=build_args
+            build_args=build_args,
+            waves=True
         )
 
         runner.test(testcase=testcase, hdl_toplevel=hdl_toplevel, test_module=module_name)

@@ -90,6 +90,7 @@ async def test_00_smoke(dut):
     rst_i = dut.rst
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
+    await FallingEdge(rst_i)
 
 
 

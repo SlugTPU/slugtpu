@@ -7,4 +7,4 @@ test_spi:
 clean:
 	rm -rf sim_build
 
-.PHONY: test_spi clean
+.PHONY: test_fifo test_spi clean
