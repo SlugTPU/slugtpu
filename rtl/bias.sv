@@ -28,9 +28,15 @@ always_ff @(posedge clk_i) begin
         data_o <= 32'b0;
         data_valid_o <= 1'b0;
     end
-    else if (data_valid_i && bias_ready_r) begin 
+    else if (data_valid_i &&
+            (bias_ready_r || bias_valid_i)) begin
         data_valid_o <= data_valid_i;
-        data_o <= bias_r + data_i; 
+
+        if (bias_valid_i) begin // bypass path
+            data_o <=  data_i + bias_i; 
+        end else begin
+            data_o <= data_i + bias_r;
+        end
     end else begin
         data_valid_o <= '0;
     end
