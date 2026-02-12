@@ -66,6 +66,7 @@ class StreamIOModel():
         rst_i = self.dut.rst_i
         clk_i = self.dut.clk_i
         valid_i = self.dut.valid_i
+        valid_o = self.dut.valid_o
         ready_o = self.dut.ready_o
 
         stop_event = Event()
@@ -85,7 +86,7 @@ class StreamIOModel():
             data_i.value = self.n_rd
 
             await RisingEdge(clk_i)
-            if (ready_o.value == 1):
+            if (ready_o.value == 1 and valid_i.value == 1):
                 self.n_rd += 1
                 cocotb.log.info(f"n_rd is now at {self.n_rd}")
             if (self.n_rd >= self.length):
@@ -120,7 +121,7 @@ class StreamIOModel():
         while True:
             await RisingEdge(clk_i)
 
-            if (valid_o.value == 1):
+            if (valid_o.value == 1 and ready_i.value == 1):
                 self.n_wr += 1
                 cocotb.log.info(f"n_wr is now at {self.n_wr}")
             if (self.n_wr >= self.length):

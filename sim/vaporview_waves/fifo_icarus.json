@@ -1,0 +1,129 @@
+{
+  "extensionVersion": "1.4.7",
+  "fileName": "/workspaces/slugtpu/sim_build/icarus/test_fifo/fifo_simple_test/DEPTH_LOG2_P_3/fifo.fst",
+  "markerTime": 196559,
+  "altMarkerTime": null,
+  "selectedSignal": null,
+  "zoomRatio": 0.0033170731707317072,
+  "scrollLeft": 149605,
+  "displayedSignals": [
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 0,
+      "name": "fifo.clk_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "clk_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 7,
+      "name": "fifo.rst_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "rst_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Handshakes",
+      "collapseState": 2,
+      "children": [
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 5,
+          "name": "fifo.ready_i",
+          "numberFormat": "binary",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "ready_i",
+          "renderType": "binary",
+          "valueLinkCommand": ""
+        },
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 8,
+          "name": "fifo.valid_i",
+          "numberFormat": "binary",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "valid_i",
+          "renderType": "binary",
+          "valueLinkCommand": ""
+        },
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 6,
+          "name": "fifo.ready_o",
+          "numberFormat": "binary",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "ready_o",
+          "renderType": "binary",
+          "valueLinkCommand": ""
+        },
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 9,
+          "name": "fifo.valid_o",
+          "numberFormat": "binary",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "valid_o",
+          "renderType": "binary",
+          "valueLinkCommand": ""
+        }
+      ]
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Data",
+      "collapseState": 2,
+      "children": [
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 1,
+          "name": "fifo.data_i",
+          "numberFormat": "hexadecimal",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "data_i",
+          "renderType": "multiBit",
+          "valueLinkCommand": ""
+        },
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 2,
+          "name": "fifo.data_o",
+          "numberFormat": "hexadecimal",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "data_o",
+          "renderType": "multiBit",
+          "valueLinkCommand": ""
+        }
+      ]
+    }
+  ]
+}

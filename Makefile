@@ -1,3 +1,5 @@
+export WAVES=1
+
 test_fifo:
 	python3 -m pytest sim/test_fifo.py -s
 
