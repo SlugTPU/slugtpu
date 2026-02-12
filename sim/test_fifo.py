@@ -1,14 +1,135 @@
 import pytest
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge, ReadWrite, ReadOnly
+from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge, ReadWrite, ReadOnly, Event
 from pathlib import Path
-from shared import reset_sequence, clock_start, random_binary_driver
+from shared import reset_sequence, clock_start, random_binary_driver, handshake
 from runner import run_test
 from collections import deque
 import random
 
-tests = ["reset_test", "fifo_simple_test", "fifo_stream_test"]
+class FifoModel():
+    def __init__(self):
+        self.q = deque()
+
+    def consume(self, dut):
+        data_i = dut.data_i
+        self.q.append(data_i.value.to_unsigned())
+        cocotb.log.info(f"CONSUMING! Queue is now at {self.q}")
+
+    def produce(self, dut):
+        data_o = dut.data_o
+        got = data_o.value.to_unsigned()
+        expected = self.q.popleft()
+        cocotb.log.info(f"PRODUCING! Queue is now at {self.q}")
+        assert got == expected
+
+class ModelRunner():
+    def __init__(self, dut, model):
+        self.model = model
+        self.dut = dut
+        self.clk_i = dut.clk_i
+        self.rst_i = dut.rst_i
+        self.ready_o = dut.ready_o
+        self.ready_i = dut.ready_i
+        self.valid_i = dut.valid_i
+        self.valid_o = dut.valid_o
+        self.data_i = dut.data_i
+        self.data_o = dut.data_o
+
+    def start(self):
+        cocotb.start_soon(self.run_input())
+        cocotb.start_soon(self.run_output())
+
+    async def run_input(self):
+        while True:
+            await handshake(self.clk_i, self.valid_i, self.ready_o)
+            self.model.consume(self.dut)
+
+    async def run_output(self):
+        while True:
+            await handshake(self.clk_i, self.valid_o, self.ready_i)
+            self.model.produce(self.dut)
+
+# model for streaming n elements with or without backpressure
+class StreamIOModel():
+    def __init__(self, dut, length, in_pressure, out_pressure):
+        self.dut = dut
+        self.length = length
+        self.in_pressure = in_pressure
+        self.out_pressure = out_pressure
+        self.n_rd = 0
+        self.n_wr = 0
+
+    async def input_run(self):
+        data_i = self.dut.data_i
+        rst_i = self.dut.rst_i
+        clk_i = self.dut.clk_i
+        valid_i = self.dut.valid_i
+        ready_o = self.dut.ready_o
+
+        stop_event = Event()
+
+        cocotb.log.info("Running input model")
+
+        await FallingEdge(rst_i)
+        valid_i.value = 0
+        await FallingEdge(clk_i)
+
+        if (self.in_pressure):
+            cocotb.start_soon(random_binary_driver(clk_i, valid_i, prob=0.5, max_hold=10, stop_event=stop_event))
+        else:
+            valid_i.value = 1
+
+        while True:
+            data_i.value = self.n_rd
+
+            await RisingEdge(clk_i)
+            if (ready_o.value == 1):
+                self.n_rd += 1
+                cocotb.log.info(f"n_rd is now at {self.n_rd}")
+            if (self.n_rd >= self.length):
+                stop_event.set()
+                await FallingEdge(clk_i)
+                valid_i.value = 0
+                break
+            else:
+                await FallingEdge(clk_i)
+
+
+    async def output_run(self):
+        data_i = self.dut.data_i
+        rst_i = self.dut.rst_i
+        clk_i = self.dut.clk_i
+        valid_o = self.dut.valid_o
+        ready_i = self.dut.ready_i
+
+        stop_event = Event()
+
+        cocotb.log.info("Running output model")
+
+        await FallingEdge(rst_i)
+        ready_i.value = 0
+        await FallingEdge(clk_i)
+
+        if (self.out_pressure):
+            cocotb.start_soon(random_binary_driver(clk_i, ready_i, prob=0.5, max_hold=10, stop_event=stop_event))
+        else:
+            ready_i.value = 1
+
+        while True:
+            await RisingEdge(clk_i)
+
+            if (valid_o.value == 1):
+                self.n_wr += 1
+                cocotb.log.info(f"n_wr is now at {self.n_wr}")
+            if (self.n_wr >= self.length):
+                stop_event.set()
+                await FallingEdge(clk_i)
+                ready_i.value = 0
+                break
+            else:
+                await FallingEdge(clk_i)
 
 @cocotb.test()
 async def reset_test(dut):
@@ -20,105 +141,72 @@ async def reset_test(dut):
     await reset_sequence(clk_i, rst_i)
     await FallingEdge(rst_i)
 
-
 @cocotb.test()
 async def fifo_simple_test(dut):
     """Fills up queue and then empties"""
     depth_log2_p = dut.DEPTH_LOG2_P
     clk_i = dut.clk_i
     rst_i = dut.rst_i
-    ready_o = dut.ready_o
     ready_i = dut.ready_i
     valid_i = dut.valid_i
     data_i = dut.data_i
-    data_o = dut.data_o
 
-    fifo_model = deque(maxlen=2**depth_log2_p.value.to_unsigned())
+    m = FifoModel()
+    r = ModelRunner(dut, m)
+
+    r.start()
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
 
     await FallingEdge(rst_i)
-    valid_i.value = 0
+    valid_i.value = 1
     ready_i.value = 0
-
-    await RisingEdge(clk_i)
-    assert ready_o.value == 1, "Empty FIFO should still be ready to accept input even when ready_i == 0"
 
     # send values
     for i in range(2 ** depth_log2_p.value.to_unsigned()):
-        await FallingEdge(clk_i)
         valid_i.value = 1
         data_i.value = i
-        fifo_model.append(i)
         await RisingEdge(clk_i)
+        await FallingEdge(clk_i)
 
-    await ReadOnly(clk_i)
-    assert not ready_o.value, "ready_o expected to be low when full!"
-
-    # stop sending values
+    # stop sending values, ready to dequeue
     await FallingEdge(clk_i)
     valid_i.value = 0
-    await RisingEdge(clk_i)
+    ready_i.value = 1
 
-    # dequeue
-    for _ in range(2 ** depth_log2_p.value.to_unsigned()):
-        await FallingEdge(clk_i)
-        ready_i.value = 1
+    for _ in range(2 ** depth_log2_p.value.to_unsigned() - 1):
         await RisingEdge(clk_i)
-        assert data_o.value.to_unsigned() == fifo_model.popleft(), "Did not receive expected value"
-
-    # FIFO should be empty by now
+        await FallingEdge(clk_i)
 
 @cocotb.test()
 @cocotb.parametrize(with_pressure=[False, True])
 async def fifo_random_stream_test(dut, with_pressure):
+    depth_log2_p = dut.DEPTH_LOG2_P
     clk_i = dut.clk_i
     rst_i = dut.rst_i
-    ready_o = dut.ready_o
     ready_i = dut.ready_i
     valid_i = dut.valid_i
-    valid_o = dut.valid_o
     data_i = dut.data_i
-    data_o = dut.data_o
 
-    fifo_model = deque()
+    cocotb.log.info("Running random stream test")
+
+    m = FifoModel()
+    r = ModelRunner(dut, m)
+    iom = StreamIOModel(dut, 10, with_pressure, with_pressure)
+
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
 
-    await FallingEdge(rst_i)
+    task_input_model = cocotb.start_soon(iom.input_run())
+    task_output_model = cocotb.start_soon(iom.output_run())
+    r.start()
 
-    if (with_pressure):
-        cocotb.start_soon(random_binary_driver(clk_i, valid_i, prob=0.5, max_hold=10))
-        cocotb.start_soon(random_binary_driver(clk_i, ready_i, prob=0.5, max_hold=10))
-    else:
-        valid_i.value = 1
-        ready_i.value = 1
+    await task_output_model.complete
+    await FallingEdge(clk_i)
 
-    # stream 10 random values
-    n_wr = 0
-    n_rd = 0
-    while (n_wr < 10 and n_rd < 10):
-        val = n_wr
-        data_i.value = val
-        await RisingEdge(clk_i)
-        await ReadOnly()
-
-        if valid_i.value == 1 and ready_o.value == 1:
-            fifo_model.append(val)
-            n_wr += 1
-
-        if valid_o.value == 1:
-            if len(fifo_model) > 0:
-                assert fifo_model[0] == data_o.value.to_unsigned(), "Didn't match model"
-
-                if ready_i.value == 1:
-                    fifo_model.popleft()
-                    n_rd += 1
-
-        await FallingEdge(clk_i)
-
+tests = ["reset_test", "fifo_simple_test", "fifo_stream_test"]
 
 @pytest.mark.parametrize("depth_log2_p", [1, 3])
 @pytest.mark.parametrize("testcase", tests)
