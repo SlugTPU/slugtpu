@@ -1,5 +1,3 @@
-`timescale 1ns/1ps
-
 module tpu #(
 	parameter int N = 8,
 	parameter int DATA_W = 8,
