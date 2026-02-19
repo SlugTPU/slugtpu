@@ -51,7 +51,7 @@ module pe #(
         if (prev_sel == sel)
             weight_out <= weight_in;
         else
-            weight_out <= old_weight_in; 
+            weight_out <= prev_weight_in; 
         
     end
 
