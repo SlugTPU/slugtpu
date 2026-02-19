@@ -32,7 +32,7 @@ module load_scalar_data
     // ,output[0:0] load_ready_o
 
     // In our case, this should be [31:0] [7:0]
-    ,output[scalar_data_width_p-1:0] scalar_values_o [(num_lanes*lane_depth_p)-1:0]
+    ,output signed [scalar_data_width_p-1:0] scalar_values_o [(num_lanes*lane_depth_p)-1:0]
     );
     initial begin
         assert(read_bus_width % scalar_data_width_p == 0) 
