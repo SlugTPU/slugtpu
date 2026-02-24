@@ -18,7 +18,6 @@ module shift
       end
    end
 
-   // Handle the general shift register case
    for(genvar i = 1; i < depth_p; i++) begin : buffer_shift_loop
       always_ff @(posedge clk_i) begin
          if (reset_i) begin
@@ -28,7 +27,9 @@ module shift
          end
       end
    end
-   
-   assign data_o = buffer_r;
-   
+
+   for(genvar i = 0; i < depth_p; i++) begin : data_o_assign
+      assign data_o[i] = buffer_r[i];
+   end
+
 endmodule
