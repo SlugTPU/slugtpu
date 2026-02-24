@@ -9,6 +9,9 @@ test_spi:
 test_bias:
 	python3 -m pytest sim/test_bias.py -s
 
+test_tpuspi:
+	python3 -m pytest sim/test_tpu_spi_ctrl.py -s
+
 clean:
 	rm -rf sim_build
 
