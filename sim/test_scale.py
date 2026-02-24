@@ -76,7 +76,6 @@ class ModelRunner():
 		cocotb.start_soon(self.run_output())
 
 	async def run_input(self):
-		await FallingEdge(self.rst_i)
 		while True:
 			await RisingEdge(self.clk_i)
 			# mirror DUT: when scale_valid_i is asserted the DUT latches the
@@ -89,7 +88,6 @@ class ModelRunner():
 				self.model.capture_data(self.dut)
 
 	async def run_output(self):
-		await FallingEdge(self.rst_i)
 		while True:
 			await RisingEdge(self.clk_i)
 			if int(self.data_valid_o.value) == 1:
