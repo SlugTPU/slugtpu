@@ -12,6 +12,9 @@ test_bias:
 test_scalar_load:
 	python3 -m pytest sim/test_load_data.py -s
 
+test_add_n:
+	python3 -m pytest sim/test_add_n.py -s
+
 clean:
 	rm -rf sim_build
 

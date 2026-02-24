@@ -17,17 +17,17 @@ module add_n
     logic signed [width_p-1:0] data_r [N-1:0];
     genvar i;
     generate
-        for (i = 0; i < N i++) begin
-            assign data_r = data_i[i] + bias_i[i];
+        for (i = 0; i < N; i++) begin
+            assign data_r[i] = data_i[i] + bias_i[i];
         end
     endgenerate
 
     elastic
-        #(width_p=32,
-        depth_p=8)
+        #(.width_p(width_p),
+        .depth_p(N))
     add_elastic
         (.clk_i(clk_i)
-        ,.reset_i(rst_i)
+        ,.rst_i(rst_i)
         ,.data_i(data_r)
         ,.valid_i(data_valid_i)
         ,.ready_o(data_ready_o)
