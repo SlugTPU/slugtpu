@@ -11,9 +11,8 @@ from shared import stringify_dict
 
 LANGUAGE = os.getenv("HDL_TOPLEVEL_LANG", "verilog").lower().strip()
 
-def run_test(parameters, sources, module_name, hdl_toplevel, testcase=None):
+def run_test(parameters, sources, module_name, hdl_toplevel, testcase=None, sims = ["icarus", "verilator"]):
     timescale = ("1ps","1ps")
-    sims = ["icarus", "verilator"]
     case_name = "all"
 
     if testcase is not None:
@@ -26,6 +25,7 @@ def run_test(parameters, sources, module_name, hdl_toplevel, testcase=None):
         # extra stuff specifically for verilator
         if (sim == "verilator"):
             build_args.append("--trace-fst")
+            # build_args.append("--timing")
 
         runner = get_runner(sim)
         runner.build(

@@ -15,6 +15,9 @@ test_scalar_load:
 test_add_n:
 	python3 -m pytest sim/test_add_n.py -s
 
+test_sram:
+	python3 -m pytest sim/test_sram.py -s
+
 clean:
 	rm -rf sim_build
 
