@@ -27,7 +27,7 @@ module sub_zp(
     //pipeline next state
     logic signed [31:0] zp_active;
     logic pipe_valid_d;
-    logic signed [31:o] pipe_data_d;
+    logic signed [31:0] pipe_data_d;
 
     always_comb begin
         zp_active = (zp_valid_i) ? zp_i : zp_q;
