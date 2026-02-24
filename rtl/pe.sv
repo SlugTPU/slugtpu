@@ -1,55 +1,58 @@
-`timescale 1ns/1ps
-
-
 module pe #(
-    parameter int INPUT_WIDTH = 8,
-    parameter int WEIGHT_WIDTH = 8,
-    parameter int PSUM_WIDTH = INPUT_WIDTH + WEIGHT_WIDTH
-) (
-    input clk_i,
-    input rst_i,
+    parameter DATA_WIDTH = 8,
+    parameter ACC_WIDTH  = 32
+)(
+    input  logic                  clk_i,
+    input  logic                  rst_i,
 
-    // North wires of PE
-    input logic signed [PSUM_WIDTH - 1:0] pe_psum_i, 
-    input logic signed [WEIGHT_WIDTH - 1:0] pe_weight_i,
-    input logic [0:0] pe_weight_valid_i,
-    
-    // West wires of PE
-    input logic signed [INPUT_WIDTH - 1:0] pe_input_i, 
-    input logic [0:0] pe_input_valid_i,
+    input  logic [DATA_WIDTH+1:0] act_in,
+    output logic [DATA_WIDTH+1:0] act_out,
 
-    // South wires of the PE
-    output logic signed [PSUM_WIDTH - 1:0] pe_psum_o,
-    output logic signed [WEIGHT_WIDTH - 1:0] pe_weight_o,
-    output logic [0:0] pe_weight_valid_o,
+    input  logic [DATA_WIDTH+1:0] weight_in,
+    output logic [DATA_WIDTH+1:0] weight_out,
 
-    // East wires of the PE
-    output logic signed [INPUT_WIDTH - 1:0] pe_input_o,
-    output logic [0:0] pe_input_valid_o,
+    input  logic [ACC_WIDTH-1:0]  psum_in,
+    output logic [ACC_WIDTH-1:0]  psum_out
 );
 
-    always_ff (@posedge clk_i) begin
-        if (rst_i) begin
-            pe_psum_o <= '0;
-            pe_weight_o <= '0;
-            pe_input_o <= '0;
-            pe_input_valid_o <= 1'b0;
-            pe_weight_valid_o <= 1'b0;
-        end
-        else begin
+    logic sel;
+    logic valid;
+    logic [DATA_WIDTH-1:0] weight_data;
 
-            pe_input_valid_o <= pe_input_valid_i;
-            pe_weight_valid_o <= pe_weight_valid_i;
+    assign sel = weight_in[1];
+    assign valid = weight_in[0];
+    assign weight_data = weight_in[9:2];
 
-            if (pe_input_valid_i && pe_weight_valid_i) begin
-                pe_psum_o <= pe_psum_i + (pe_input_i * pe_weight_i); 
-            end
+    logic [DATA_WIDTH+1:0] weight_buf [0:1];
 
-            pe_weight_o <= pe_weight_i;
-            pe_input_o <= pe_input_i; 
-            //In theory, it shouldn't matter if these activate inside or outside the if statement...
-        end
+    always_ff @(posedge clk_i) begin
+        if (valid)
+            weight_buf[~sel] <= weight_data;
     end
 
+    logic [DATA_WIDTH-1:0] active_weight;
+    assign active_weight = weight_buf[sel];
+
+    always_ff @(posedge clk_i) begin
+        if (rst_i)
+            psum_out <= '0;
+        else
+            psum_out <= psum_in + (act_in * active_weight);
+    end
+
+    logic prev_sel;
+    logic [DATA_WIDTH+1:0] prev_weight_in;
+
+    always_ff @(posedge clk_i) begin
+        act_out       <= act_in;
+        prev_sel      <= sel;
+        prev_weight_in <= weight_in;
+
+        if (prev_sel == sel)
+            weight_out <= weight_in;
+        else
+            weight_out <= prev_weight_in; 
+        
+    end
 
 endmodule

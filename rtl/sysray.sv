@@ -1,99 +1,63 @@
-`timescale 1ns/1ps
-
-module sysray #(
-    parameter int N       = 2,   
-    parameter int DATA_W  = 16,  
-    parameter int PSUM_W  = 32  
+module systolic_array #(
+    parameter N          = 4,
+    parameter DATA_WIDTH = 8,
+    parameter ACC_WIDTH  = 32
 )(
-    input  logic                   clk,
-    input  logic                   rst,
+    input  logic                                    clk_i,
+    input  logic                                    rst_i,
 
-    input  logic [DATA_W-1:0]      sysdata_i   [N],
+    input  logic [N-1:0][DATA_WIDTH-1:0]            act_in,
+    input  logic [N-1:0][DATA_WIDTH-1:0]            weight_in,
+    input  logic [N-1:0]                            weight_we,
+    input  logic [N-1:0]                            buf_sel_in,
 
-    input  logic [DATA_W-1:0]      sysweight_i [N],
-
-    input  logic [N-1:0]           in_valid_input,   
-    input  logic [N-1:0]           in_valid_weight,  
-
-    output logic [N-1:0]           out_valid_input,  
-    output logic [N-1:0]           out_valid_weight  
+    output logic [N-1:0][ACC_WIDTH-1:0]             psum_out
 );
 
-    logic [DATA_W-1:0]  pe_input_data   [N][N];
-    logic [DATA_W-1:0]  pe_weight_data  [N][N];
-    logic [PSUM_W-1:0]  pe_psum         [N][N];
+    logic [N:0][N-1:0][DATA_WIDTH-1:0] act_chain;
+    logic [N:0][N-1:0][DATA_WIDTH-1:0] weight_chain;
+    logic [N:0][N-1:0]                 buf_sel_chain;
+    logic [N:0][N-1:0]                 weight_we_chain;
+    logic [N:0][N-1:0][ACC_WIDTH-1:0]  psum_chain;
 
-    logic               input_valid     [N][N];
-    logic               weight_valid    [N][N];
+    always_comb begin
+        for (int col = 0; col < N; col++) begin
+            act_chain[0][col]       = act_in[col];
+            weight_chain[0][col]    = weight_in[col];
+            weight_we_chain[0][col] = weight_we[col];
+            buf_sel_chain[0][col]   = buf_sel_in[col];
+            psum_chain[0][col]      = '0;
+        end
+    end
 
-    genvar i, j;
+    genvar row, col;
     generate
-        for (i = 0; i < N; i++) begin : ROW
-            for (j = 0; j < N; j++) begin : COLUMN
-
-                logic [DATA_W-1:0]  pe_input_i;
-                logic [DATA_W-1:0]  pe_weight_i;
-                logic [PSUM_W-1:0]  pe_psum_i;
-                logic               pe_input_valid_i;
-                logic               pe_weight_valid_i;
-
-                if (j == 0) begin
-                    assign pe_input_i       = sysdata_i[i];
-                    assign pe_input_valid_i = in_valid_input[i];
-                end
-                else begin
-                    assign pe_input_i       = pe_input_data[i][j-1];
-                    assign pe_input_valid_i = input_valid[i][j-1];
-                end
-
-                if (i == 0) begin
-                    assign pe_weight_i       = sysweight_i[j];
-                    assign pe_weight_valid_i = in_valid_weight[j];
-                end
-                else begin
-                    assign pe_weight_i       = pe_weight_data[i-1][j];
-                    assign pe_weight_valid_i = weight_valid[i-1][j];
-                end
-
-                if (i == 0) begin
-                    assign pe_psum_i = '0;  
-                end
-                else begin
-                    assign pe_psum_i = pe_psum[i-1][j];
-                end
-
+        for (row = 0; row < N; row++) begin : gen_row
+            for (col = 0; col < N; col++) begin : gen_col
                 pe #(
-                    .DATA_W (DATA_W),
-                    .PSUM_W (PSUM_W)
-                ) u_pe (
-                    .clk_i             (clk),
-                    .rst_i             (rst),
-
-                    .pe_input_i        (pe_input_i),
-                    .pe_weight_i       (pe_weight_i),
-                    .pe_input_valid_i  (pe_input_valid_i),
-                    .pe_weight_valid_i (pe_weight_valid_i),
-                    .pe_psum_i         (pe_psum_i),
-
-                    .pe_input_o        (pe_input_data[i][j]),
-                    .pe_weight_o       (pe_weight_data[i][j]),
-                    .pe_input_valid_o  (input_valid[i][j]),
-                    .pe_weight_valid_o (weight_valid[i][j]),
-                    .pe_psum_o         (pe_psum[i][j])
+                    .DATA_WIDTH(DATA_WIDTH),
+                    .ACC_WIDTH(ACC_WIDTH)
+                ) pe_inst (
+                    .clk_i        (clk_i),
+                    .rst_i        (rst_i),
+                    .act_in       (act_chain[row][col]),
+                    .act_out      (act_chain[row][col+1]),
+                    .weight_in    (weight_chain[row][col]),
+                    .weight_out   (weight_chain[row+1][col]),
+                    .buf_sel_in   (buf_sel_chain[row][col]),
+                    .buf_sel_out  (buf_sel_chain[row+1][col]),
+                    .weight_we    (weight_we_chain[row][col]),
+                    .weight_we_out(weight_we_chain[row+1][col]),
+                    .psum_in      (psum_chain[row][col]),
+                    .psum_out     (psum_chain[row+1][col])
                 );
-
             end
         end
     endgenerate
 
-    generate
-        for (i = 0; i < N; i++) begin : 
-            assign out_valid_input[i] = input_valid[i][N-1];
-        end
-
-        for (j = 0; j < N; j++) begin : 
-            assign out_valid_weight[j] = weight_valid[N-1][j];
-        end
-    endgenerate
+    always_comb begin
+        for (int col = 0; col < N; col++)
+            psum_out[col] = psum_chain[N][col];
+    end
 
 endmodule

@@ -124,6 +124,7 @@ class StreamIOModel():
             if (valid_o.value == 1 and ready_i.value == 1):
                 self.n_wr += 1
                 cocotb.log.info(f"n_wr is now at {self.n_wr}")
+            # read all expected inputs; can stop input now
             if (self.n_wr >= self.length):
                 stop_event.set()
                 await FallingEdge(clk_i)

@@ -9,7 +9,7 @@ from test_systolic_array import run_test as run_systolic_array
 class TPU_Compute_Unit:
     
     def __init__(self):
-        '''
+        
         weights = np.load('tflite_weights.npz')
         biases = np.load('tflite_biases.npz')
         scales = np.load('tflite_scales.npz')
@@ -55,7 +55,7 @@ class TPU_Compute_Unit:
 
         self.layer1_bias_scale = scales["layer1_bias_scale"]
         self.layer2_bias_scale = scales["layer2_bias_scale"]
-        '''
+        
         self.on_chip = {}
         self.off_chip_additional = {}
         self.biases = None
@@ -74,27 +74,29 @@ class TPU_Compute_Unit:
 
         test_input_quantized = float_input / self.input_scale + self.input_zero_point
 
-        layer1_32 = np.matmul(test_input_quantized, self.layer1_weights.T) + (self.layer1_bias)
+        layer1_32 = np.matmul(test_input_quantized.astype(np.int32), self.layer1_weights.T.astype(np.int32)) + (self.layer1_bias.astype(np.int32))
         # print(layer1_32)
         layer1_relu = np.maximum(0, layer1_32)
         
-        layer1_q = (layer1_relu - self.layer1_zero_point) * self.layer1_qsf
+        layer1_q = (layer1_relu - self.layer1_zero_point).astype(np.float32) * self.layer1_qsf.astype(np.float32)
+        # layer1_q = layer1_relu.astype(np.float32) * self.layer1_qsf.astype(np.float32) + self.layer1_zero_point.astype(np.float32)
         print(layer1_q)
 
-        layer1_q = np.trunc(layer1_q)
+        layer1_q = layer1_q.astype(np.int8)
         self.check = layer1_q
         print(layer1_q)
 
-        layer2_32 = (np.matmul(layer1_q, self.layer2_weights.T) + (self.layer2_bias ))
-        layer2_q = ((layer2_32 - self.layer2_zero_point ) * self.layer2_qsf )
+        layer2_32 = (np.matmul(layer1_q.astype(np.int32), self.layer2_weights.T.astype(np.int32)) + (self.layer2_bias.astype(np.int32) ))
+        layer2_q = ((layer2_32 - self.layer2_zero_point.astype(np.int32) ).astype(np.float32) * self.layer2_qsf.astype(np.float32) )
+        # layer2_q = layer2_32.astype(np.float32) * self.layer2_qsf.astype(np.float32) + self.layer2_zero_point.astype(np.float32)
         # print(layer2_q)
 
         # This is where we stop TPU and do sigmoid on host/cpu
 
-        output = self.sigmoid((layer2_q + self.layer2_zero_point) * self.layer2_scale)
+        output = self.sigmoid((layer2_q.astype(np.float32) + self.layer2_zero_point.astype(np.float32)) * self.layer2_scale.astype(np.float32))
         output = output / self.output_scale + self.output_zero_point
         print(np.round(output.flatten()).astype(np.int8))
-        print(expected_output)
+        print(expected_output.astype(np.int8))
 
     def high_level_sim(self):
         expected_output = np.load('expected_output.npz')['arr_0']
@@ -287,4 +289,5 @@ class TPU_Compute_Unit:
 
 
 t = TPU_Compute_Unit()
-t.sim()
+#t.sim()
+t.basic_correctness_test()
