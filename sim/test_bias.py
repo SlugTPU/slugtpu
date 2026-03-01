@@ -2,17 +2,14 @@ import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge, ReadWrite, ReadOnly
+from cocotb.types import LogicArray, Logic
 from pathlib import Path
 from shared import reset_sequence, clock_start, random_binary_driver
 from runner import run_test
 from collections import deque
-import random
 
 class Bias():
     def __init__(self):
-        self.bias_r = 0
-
-    def reset(self):
         self.bias_r = 0
 
     def update_bias(self, bias_i):
@@ -20,6 +17,53 @@ class Bias():
 
     def compute_output(self, data_i):
         return self.bias_r + data_i
+
+class BiasModel():
+    def __init__(self, WIDTH_P):
+        self.bias_module = Bias()
+        self.WIDTH_P = WIDTH_P
+        self.data_i = LogicArray(WIDTH_P)
+        self.valid_o = Logic(1)
+
+    # compute output
+    def produce(self, dut):
+        data_valid_o = dut.data_valid_o
+        data_o = dut.data_o
+
+        if data_valid_o.value == 1:
+            got = data_o.value.to_unsigned()
+            expected = self.bias.compute_output(dut.data_i.value.to_unsigned())
+            cocotb.log.info(f"Produced output {got}, expected {expected}")
+            assert got == expected, f"Expected {expected}, got {got}"
+
+    # update registers
+    def consume(self, dut):
+        bias_i = dut.bias_i
+        bias_valid_i = dut.bias_valid_i
+
+        if bias_valid_i.value == 1:
+            self.bias_module.update_bias(bias_i.value.to_unsigned())
+        
+class ModelRunner():
+    def __init__(self, dut):
+        self.dut = dut
+        self.bias_model = BiasModel(dut.WIDTH_P)
+
+    async def run_input(self):
+        while True:
+            await RisingEdge(self.dut.clk_i)
+            await ReadWrite()
+            self.bias_model.consume(self.dut)
+
+    async def run_output(self):
+        while True:
+            await RisingEdge(self.dut.clk_i)
+            await ReadOnly()
+            self.bias_model.produce(self.dut)
+
+    async def run(self):
+        cocotb.start_soon(self.run_input())
+        cocotb.start_soon(self.run_output())
 
 
 @cocotb.test()
@@ -57,10 +101,6 @@ async def bias_simple_test(dut):
     data_valid_i.value = 1
 
     await RisingEdge(clk_i)
-    await ReadOnly()
-
-    assert data_valid_o.value == 1, "Expected data_valid_o to be high"
-    assert data_o.to_unsigned() == 17, f"Expected 17, got {data_o.to_unsigned()}"
 
 
 tests = ["reset_test", "bias_simple_test"]
@@ -72,6 +112,10 @@ def test_bias_each(testcase):
     sources = [ proj_path/"bias.sv" ]
 
     run_test(parameters={}, sources=sources, module_name="test_bias", hdl_toplevel="bias", testcase=testcase)
+
+# TODO: add more tests
+# - test backpressure
+# - random fuzzing of handshake signals and data
 
 def test_bias_all():
     """Runs each test sequentially as one giant test."""
