@@ -8,6 +8,19 @@ from runner import run_test
 from collections import deque
 import random
 
+class Bias():
+    def __init__(self):
+        self.bias_r = 0
+
+    def reset(self):
+        self.bias_r = 0
+
+    def update_bias(self, bias_i):
+        self.bias_r = bias_i
+
+    def compute_output(self, data_i):
+        return self.bias_r + data_i
+
 
 @cocotb.test()
 async def reset_test(dut):
