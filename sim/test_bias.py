@@ -14,7 +14,7 @@ async def reset_test(dut):
     """Test for Initialization"""
     clk_i = dut.clk_i
     rst_i = dut.rst_i
-
+ 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
     await FallingEdge(rst_i)
@@ -29,6 +29,7 @@ async def bias_simple_test(dut):
     data_i = dut.data_i
     data_valid_i = dut.data_valid_i
     data_valid_o = dut.data_valid_o
+    data_o = dut.data_o
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
@@ -37,16 +38,16 @@ async def bias_simple_test(dut):
 
     # load bias
     bias_i.value = 15
-    bias_valid_i = 1
+    bias_valid_i.value = 1
     # load data
     data_i.value = 2
-    data_i.valid_i = 1
+    data_valid_i.value = 1
 
     await RisingEdge(clk_i)
     await ReadOnly()
 
     assert data_valid_o.value == 1, "Expected data_valid_o to be high"
-    assert data_o.to_unsigned() == 17, "Expected 17, got {data_o.to_unsigned()}"
+    assert data_o.to_unsigned() == 17, f"Expected 17, got {data_o.to_unsigned()}"
 
 
 tests = ["reset_test", "bias_simple_test"]
