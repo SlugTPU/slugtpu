@@ -86,6 +86,8 @@ async def bias_simple_test(dut):
     data_i = dut.data_i
     data_valid_i = dut.data_valid_i
     data_valid_o = dut.data_valid_o
+    ready_i = dut.ready_i
+    ready_o = dut.ready_o
     data_o = dut.data_o
 
     await clock_start(clk_i)
@@ -93,6 +95,7 @@ async def bias_simple_test(dut):
 
     await FallingEdge(rst_i)
 
+    ready_i.value = 1
     # load bias
     bias_i.value = 15
     bias_valid_i.value = 1
