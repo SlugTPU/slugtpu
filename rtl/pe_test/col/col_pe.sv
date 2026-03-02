@@ -41,7 +41,7 @@ module pe_col #(
         .weight_in (weight_mid),   // receives from PE0
         .weight_out(),
         .weight_latch (weight_latch),
-        .bug_sel (buf_sel),
+        .buf_sel (buf_sel),
         .psum_in   (psum_mid),
         .psum_out  (psum_out)
     );
