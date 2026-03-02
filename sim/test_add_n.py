@@ -7,7 +7,7 @@ from shared import reset_sequence, clock_start, random_binary_driver
 from runner import run_test
 from collections import deque
 from cocotb.types import LogicArray, Logic, Array
-import queue
+from collections import deque
 import random
 from shared import handshake
 
@@ -32,16 +32,17 @@ class add_n_model():
     def __init__(self, N, width):
         self.N = N
         self.width = width
-        self.q = queue.SimpleQueue()
+        self.q = deque(maxlen=1)
 
     def consume(self, dut):
-        self.q.put((dut.data_i, dut.bias_i))
+        self.q.append((dut.data_i, dut.bias_i))
 
     def produce(self, dut):
         data_o = dut.data_o
 
         got = data_o.value.to_signed()
-        expected = add_n(dut.data_i, dut.bias_i, self.N, self.width).to_signed()
+        inp, bias = self.q.popleft()
+        expected = add_n(inp, bias, self.N, self.width).to_signed()
         assert got == expected, f"Expected {expected}, got {got}"
 
 class ModelRunner():
