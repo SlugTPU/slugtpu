@@ -5,8 +5,8 @@ module pe #(
     input  logic                  clk_i,
     input  logic                  rst_i,
 
-    input  logic [DATA_WIDTH+1:0] act_in,
-    output logic [DATA_WIDTH+1:0] act_out,
+    input  logic [DATA_WIDTH-1:0] act_in,
+    output logic [DATA_WIDTH-1:0] act_out,
 
     input  logic [DATA_WIDTH+1:0] weight_in,
     output logic [DATA_WIDTH+1:0] weight_out,
@@ -48,14 +48,15 @@ module pe #(
 
     always_ff @(posedge clk_i) begin
         act_out       <= act_in;
-        prev_sel      <= sel;
         prev_weight_in <= weight_in;
 
         if (prev_sel == sel)
             weight_out <= weight_in;
         else
-            weight_out <= prev_weight_in; 
-        
+            weight_out <= prev_weight_in;
+        prev_sel <= sel;
+
+        weight_out <= weight_in;	
     end
 
 endmodule
