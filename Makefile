@@ -27,6 +27,9 @@ test_tri:
 test_quantizer_mul:
 	python3 -m pytest sim/test_quantizer_mul.py -s
 
+test_write_transaction:
+	python3 -m pytest sim/test_write_transaction.py -s
+
 clean:
 	rm -rf sim_build
 
