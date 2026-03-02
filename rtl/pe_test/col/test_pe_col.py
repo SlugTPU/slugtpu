@@ -1,43 +1,39 @@
 """
 test_pe_col.py - cocotb testbench for pe_col (2 PEs stacked vertically)
 
-Topology:
-    weight_in --> [PE0] --> weight_out
-                    |
-                 psum_mid
-                    |
-                 [PE1] --> psum_out
+new topology:
+weight_in -> pe0 -> weight_mid  -> pe1
+              |                     |
+            psum_in=0 -> psum_mid -> psum_out
 
-Timing:
-    Cycle B1: W loads into PE0
-    Cycle B2: W flows down to PE1
-    Cycle C1: sel swaps, act0=A00 into PE0
-    Cycle C2: act1=A10 into PE1 — PE0 result in psum_mid
-    Cycle C3: psum_out = W*A00 + W*A10  <-- read here
+loading uses a shift reg + broadcast latch:
+    shift s1: weight_in = w1 (for pe1, bottom), latch = 0
+    shift s2: weight_in = w2 (for pe0, top) latch=1
+    
+At s2 posedge, pe0 captures w2 from weight in, pe1 captures w1 from weight_mid
+
+Compute (buf_sel flips):
+    C1: act0 = A00 -> pe0 computes w2 * A00
+    C2: act1 = A10 -> pe1 computes psum_mid + w1*A10 = w2*A00 + w1+A10  
 """
 
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge
 
-def pack_weight(valid, sel, data):
-    """
-    [0]   = valid  (1 = write data into shadow buffer)
-    [1]   = sel    (selects active buffer)
-    [9:2] = data
-    """
-    return (valid & 0x1) | ((sel & 0x1) << 1) | ((data & 0xFF) << 2)
-
 async def do_reset(dut):
-    dut.rst_i.value     = 1
-    dut.act0_in.value   = 0
-    dut.act1_in.value   = 0
-    dut.weight_in.value = pack_weight(0, 0, 0)
-    dut.psum_in.value   = 0
+    dut.rst_i.value = 1
+    dut.act0_in.value = 0
+    dut.act1_in.value = 0
+    dut.weight_in.value = 0
+    dut.weight_latch.value = 0
+    dut.buf_sel.value = 0
+    dut.psum_in.value = 0
     await RisingEdge(dut.clk_i)
     await RisingEdge(dut.clk_i)
     dut.rst_i.value = 0
     await RisingEdge(dut.clk_i)
+
 
 async def tick(dut):
     await RisingEdge(dut.clk_i)
@@ -46,52 +42,62 @@ async def tick(dut):
 @cocotb.test()
 async def test_basic_flow(dut):
     """
-    Bootstrap W into both PEs via weight flow-down, then stream skewed activations.
+    Load two unique weights via shift + latch, then compute.
 
-    W   = 3
-    A00 = 4  (PE0, cycle 1)
-    A10 = 5  (PE1, cycle 2 — skewed by 1)
+    W2 = 2 -> PE0 (top) A00= 5
+    W1 = 7 -> PE1 (bottom) A10 = 4
 
-    Expected: W * (A00 + A10) = 3 * 9 = 27
+    Expected psum_out = W2*A00 + W1*A10 = 2*5 + 7*4 = 10 + 28 = 38
     """
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
     await do_reset(dut)
 
-    W   = 7
-    W2  = 2
+    W1 = 7 # for PE1 (bottom), sent first so it shifts down
+    W2 = 2 # for PE0 (top), sent second, stays at top
     A00 = 5
     A10 = 4
 
-    # Cycle B1: W arrives at PE0
-    dut.weight_in.value = pack_weight(valid=1, sel=0, data=W)
-    dut.act0_in.value   = 0
-    dut.act1_in.value   = 0
-    dut.psum_in.value   = 0
+    #Shift phase (buf_sel=0, so shadow = buf[1])
+
+    # sr1: W1 enters PE0's shift register; PE1 sees nothing yet
+    dut.weight_in.value = W1
+    dut.weight_latch.value = 0
+    dut.buf_sel.value = 0
+    dut.act0_in.value = 0
+    dut.act1_in.value = 0
+    dut.psum_in.value = 0
     await tick(dut)
 
-    # Cycle B2: W2 flows down to PE1
-    dut.weight_in.value = pack_weight(valid=1, sel=0, data=W2)
+    # sr2: W2 enters PE0, W1 has shifted to PE1. now latch
+    dut.weight_in.value    = W2
+    dut.weight_latch.value = 1
+    await tick(dut)
+    # now PE0.buf[1] = W2, PE1.buf[1] = W1
+
+    # compute phase (flip buf_sel so buf[1] is active)
+
+    dut.weight_latch.value = 0
+    dut.buf_sel.value = 1
+
+    # C1
+    dut.act0_in.value = A00
+    dut.act1_in.value = 0
+    await tick(dut)
+    # PE0.psum_out = 0 + A00*W2
+
+    # C2
+    dut.act0_in.value = 0
+    dut.act1_in.value = A10
+    await tick(dut)
+    # PE1.psum_out = (A00*W2) + A10*W1
+
+    # C3: drain. result is registered, read here
+    dut.act0_in.value = 0
+    dut.act1_in.value = 0
     await tick(dut)
 
-    # Cycle C1: swap sel=1 so buf[1] is active, act0=A00 into PE0
-    dut.weight_in.value = pack_weight(valid=1, sel=1, data=0)
-    dut.act0_in.value   = A00
-    dut.act1_in.value   = 0
-    await tick(dut)
-
-    # Cycle C2: act1=A10 into PE1, psum_mid from PE0 now available
-    dut.weight_in.value = pack_weight(valid=1, sel=1, data=0)
-    dut.act0_in.value   = 0
-    dut.act1_in.value   = A10
-    await tick(dut)
-
-    # Cycle C3: psum_out is registered — read here
-    dut.weight_in.value = pack_weight(valid=0, sel=1, data=0)
-    dut.act0_in.value   = 0
-    dut.act1_in.value   = 0
-    await tick(dut)
-
-    expected = W2 * A00 + W * A10  
-    assert dut.psum_out.value == expected, \
-        f"Expected {expected}, got {int(dut.psum_out.value)}"
-    cocotb.log.info(f"PASS: basic_flow  psum_out={int(dut.psum_out.value)}")
+    got = int(dut.psum_out.value)
+    expected = W2 * A00 + W1 * A10
+    cocotb.log.info(f"psum_out = {got},  expected = {expected}")
+    assert got == expected, f"FAIL: expected {expected}, got {got}"
+    cocotb.log.info("PASS: test_basic_flow")

@@ -8,13 +8,16 @@ module pe_col #(
     input  logic [DATA_WIDTH-1:0] act0_in,
     input  logic [DATA_WIDTH-1:0] act1_in,
 
-    input  logic [DATA_WIDTH+1:0] weight_in,   // enters at top
+    input  logic [DATA_WIDTH-1:0] weight_in,   // enters at top, flows down
 
+    input  logic weight_latch,//control broadcast
+    input  logic buf_sel,
+    
     input  logic [ACC_WIDTH-1:0]  psum_in,
     output logic [ACC_WIDTH-1:0]  psum_out
 );
 
-    logic [DATA_WIDTH+1:0] weight_mid;  // weight_out of PE0 -> weight_in of PE1
+    logic [DATA_WIDTH-1:0] weight_mid;  // weight_out of PE0 -> weight_in of PE1
     logic [ACC_WIDTH-1:0]  psum_mid;
 
     pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) u_pe0 (
@@ -24,6 +27,8 @@ module pe_col #(
         .act_out   (),
         .weight_in (weight_in),
         .weight_out(weight_mid),   // flows down to PE1
+        .weight_latch (weight_latch),
+        .buf_sel (buf_sel),
         .psum_in   (psum_in),
         .psum_out  (psum_mid)
     );
@@ -35,6 +40,8 @@ module pe_col #(
         .act_out   (),
         .weight_in (weight_mid),   // receives from PE0
         .weight_out(),
+        .weight_latch (weight_latch),
+        .bug_sel (buf_sel),
         .psum_in   (psum_mid),
         .psum_out  (psum_out)
     );
