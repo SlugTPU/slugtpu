@@ -1,11 +1,15 @@
 {
-  "extensionVersion": "1.4.7",
-  "fileName": "/workspaces/slugtpu/sim_build/icarus/test_fifo/fifo_simple_test/DEPTH_LOG2_P_3/fifo.fst",
-  "markerTime": 196559,
+  "extensionVersion": "1.5.0",
+  "fileName": "/Users/raph/slugtpu/sim_build/icarus/test_fifo/all/DEPTH_LOG2_P_3/fifo.fst",
+  "markerTime": 105002,
   "altMarkerTime": null,
-  "selectedSignal": null,
-  "zoomRatio": 0.0033170731707317072,
-  "scrollLeft": 149605,
+  "selectedSignal": {
+    "name": "fifo.rst_i",
+    "msb": -1,
+    "lsb": -1
+  },
+  "zoomRatio": 0.00396839893595445,
+  "scrollLeft": 17639,
   "displayedSignals": [
     {
       "dataType": "netlist-variable",
