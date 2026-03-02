@@ -1,0 +1,198 @@
+{
+  "extensionVersion": "1.5.0",
+  "fileName": "/home/hare/slugtpu/sim_build/icarus/test_bias/bias_simple_test/bias.fst",
+  "markerTime": 96274,
+  "altMarkerTime": null,
+  "selectedSignal": {
+    "name": "bias.bias_ready_r",
+    "msb": -1,
+    "lsb": -1
+  },
+  "zoomRatio": 0.027213963990029105,
+  "scrollLeft": 89035,
+  "displayedSignals": [
+    {
+      "dataType": "signal-group",
+      "groupName": "Global",
+      "collapseState": 2,
+      "children": []
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 2,
+      "name": "bias.clk_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "clk_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 7,
+      "name": "bias.rst_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "rst_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "signal-separator",
+      "label": "---",
+      "rowHeight": 1
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Ready/Valid",
+      "collapseState": 2,
+      "children": []
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 1,
+      "name": "bias.bias_valid_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "bias_valid_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 4,
+      "name": "bias.data_valid_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "data_valid_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 11,
+      "name": "bias.data_valid_o",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "data_valid_o",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 5,
+      "name": "bias.ready_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "ready_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 6,
+      "name": "bias.ready_o",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "ready_o",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Input",
+      "collapseState": 2,
+      "children": []
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 3,
+      "name": "bias.data_i",
+      "numberFormat": "signed",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "data_i",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 0,
+      "name": "bias.bias_i",
+      "numberFormat": "signed",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "bias_i",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Output",
+      "collapseState": 2,
+      "children": []
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 10,
+      "name": "bias.data_o",
+      "numberFormat": "signed",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "data_o",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "signal-separator",
+      "label": "---",
+      "rowHeight": 1
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Internal",
+      "collapseState": 2,
+      "children": []
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 9,
+      "name": "bias.bias_ready_r",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "bias_ready_r",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    }
+  ]
+}

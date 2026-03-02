@@ -7,11 +7,15 @@ module bias(
     input logic data_valid_i,
     input logic signed [31:0] data_i,
     output logic data_valid_o,
-    output logic signed [31:0] data_o
+    output logic signed [31:0] data_o,
+    input logic ready_i,
+    output logic ready_o
 );
 
 logic signed [31:0] bias_r;
 logic bias_ready_r;
+
+assign ready_o = !data_valid_o || ready_i;
 
 always_ff @(posedge clk_i) begin
     if (rst_i) begin
@@ -19,7 +23,7 @@ always_ff @(posedge clk_i) begin
         bias_ready_r <= '0;
     end else if (bias_valid_i) begin
         bias_r <= data_i;
-        bias_ready_r <= '0;
+        bias_ready_r <= '1;
     end
 end
 
@@ -29,7 +33,8 @@ always_ff @(posedge clk_i) begin
         data_valid_o <= 1'b0;
     end
     else if (data_valid_i &&
-            (bias_ready_r || bias_valid_i)) begin
+            (bias_ready_r || bias_valid_i)) 
+    begin
         data_valid_o <= data_valid_i;
 
         if (bias_valid_i) begin // bypass path
