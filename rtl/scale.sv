@@ -38,7 +38,7 @@ always_ff @(posedge clk_i) begin
         scale_r <= '0;
         scale_ready_r <= '0;
     end else if (scale_valid_i) begin
-        scale_r <= data_i;
+        scale_r <= scale_i;
         scale_ready_r <= '0;
     end
 end
