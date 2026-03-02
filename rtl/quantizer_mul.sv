@@ -1,3 +1,6 @@
+/* Implementation of quantizer multiplication step (scaled by m0) for 8-bit quantization output
+ *  Note: Currently is hardcoded for 8-bit output, but can be parameterized if needed
+*/
 module quantizer_mul #(
     parameter int ACC_WIDTH = 32,
     parameter int FIXED_SHIFT = 16,
@@ -18,9 +21,10 @@ module quantizer_mul #(
     // Fixed Rounding (effective adds +0.5 to shifted result)
     assign rounded = product + (1 << (FIXED_SHIFT - 1));
 
+    // Shift to convert from integer representation to fixed point representation
     assign shifted = rounded >>> FIXED_SHIFT;
 
-    // Saturation
+    // Output truncated with saturation
     always_comb begin
         if (shifted > 127)       q_out = 8'sd127;
         else if (shifted < -128) q_out = -8'sd128;
