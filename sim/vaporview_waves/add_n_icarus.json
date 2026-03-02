@@ -1,0 +1,101 @@
+{
+  "extensionVersion": "1.5.0",
+  "fileName": "/Users/raph/slugtpu/sim_build/icarus/test_add_n/add_n_simple_test/add_n.fst",
+  "markerTime": null,
+  "altMarkerTime": null,
+  "selectedSignal": null,
+  "zoomRatio": 0.0043910216993249705,
+  "scrollLeft": 0,
+  "displayedSignals": [
+    {
+      "dataType": "signal-group",
+      "groupName": "Global",
+      "collapseState": 2,
+      "children": []
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 0,
+      "name": "add_n.clk_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "clk_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 3,
+      "name": "add_n.rst_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "rst_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Handshake",
+      "collapseState": 2,
+      "children": []
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 1,
+      "name": "add_n.data_ready_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "data_ready_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 5,
+      "name": "add_n.data_ready_o",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "data_ready_o",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 2,
+      "name": "add_n.data_valid_i",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "data_valid_i",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 4,
+      "name": "add_n.data_valid_o",
+      "numberFormat": "binary",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "data_valid_o",
+      "renderType": "binary",
+      "valueLinkCommand": ""
+    }
+  ]
+}
