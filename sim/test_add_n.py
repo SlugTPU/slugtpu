@@ -17,7 +17,7 @@ def logic_add(a: LogicArray, b: LogicArray, width: int) -> LogicArray:
 
     Assumes inputs are signed and returns a signed result.
     """
-    res = (a.to_signed() + b.to_signed()) & (1 << width) - 1
+    res = (a.to_signed() + b.to_signed()) & ((1 << width) - 1)
     return LogicArray.from_signed(res, width)
 
 def add_n(data_i: Array[LogicArray], bias_i: Array[LogicArray], N: int, width: int) -> Array[LogicArray]:
