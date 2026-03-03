@@ -1,3 +1,5 @@
+// DEPRECATED: This file is no longer maintained as the scale module is no longer used in the design. However, it may still be useful as a reference for how to write cocotb tests and models.
+
 // Implements fixed point scale factor stage to scale down the psum back to 8 bits
 
 module scale #(

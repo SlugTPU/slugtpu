@@ -1,3 +1,5 @@
+// DEPRECATED: This file is no longer maintained as the bias module is no longer used in the design. However, it may still be useful as a reference for how to write cocotb tests and models.
+
 module bias(
     input logic clk_i,
     input logic rst_i,
