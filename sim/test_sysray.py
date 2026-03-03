@@ -1,7 +1,3 @@
-"""
-Testbench for sysray.sv  –  2x2 systolic array
-(copy to sim/test_sysray.py)
-"""
 from __future__ import annotations
 from pathlib import Path
 import cocotb
