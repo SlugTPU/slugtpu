@@ -50,7 +50,7 @@ def scalar_pipe_ref(data, bias, zp, scale):
 
 
 async def init(dut):
-    cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
+    cocotb.start_soon(Clock(dut.clk_i, 10, unit="ns").start())
     dut.rst_i.value = 1
     dut.data_valid_i.value = 0
     dut.data_ready_i.value = 1
