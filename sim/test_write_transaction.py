@@ -30,45 +30,49 @@ async def test_simple(dut):
     await reset_sequence(clk_i, rst_i)
 
     await FallingEdge(rst_i)
-    await FallingEdge(clk_i)
+    for _ in range (2):
+        await FallingEdge(clk_i)
 
-    assert load_ready_o.value == 1
-    assert valid_o.value == 0
-    assert ready_o.value == 0
-
-    await FallingEdge(clk_i)
-
-    count = 8
-    start_addr = 0
-    load_valid_i.value = 1
-    amount.value = count
-    addr_i.value = start_addr
-    valid_i.value = 0
-    ready_i.value = 0
-    await FallingEdge(clk_i)
-
-    assert load_ready_o.value == 0
-    assert valid_o.value == 0
-    assert ready_o.value == 0
-    await RisingEdge(clk_i)
-
-    for i in range(count):
-        
-        ready_i.value = 1
-        valid_i.value = 1
-        data_i.value = i
+        assert load_ready_o.value == 1
+        assert valid_o.value == 0
+        assert ready_o.value == 0
 
         await FallingEdge(clk_i)
-        assert valid_o.value == 1
-        assert ready_o.value == 1
-        assert data_o.value == i
-        assert addr_o.value == i+start_addr
+
+        count = 8
+        start_addr = 0
+        load_valid_i.value = 1
+        amount.value = count
+        addr_i.value = start_addr
+        valid_i.value = 0
+        ready_i.value = 0
+        await FallingEdge(clk_i)
+        load_valid_i.value = 0
+        assert load_ready_o.value == 0
+        assert valid_o.value == 0
+        assert ready_o.value == 0
         await RisingEdge(clk_i)
-    await FallingEdge(clk_i)
-    assert load_ready_o.value == 1
-    assert valid_o.value == 0
 
+        for i in range(count):
+            
+            ready_i.value = 1
+            valid_i.value = 1
+            data_i.value = i
 
+            await FallingEdge(clk_i)
+            assert valid_o.value == 1
+            assert ready_o.value == 1
+            assert data_o.value == i
+            assert addr_o.value == i+start_addr
+            await RisingEdge(clk_i)
+        await FallingEdge(clk_i)
+        assert load_ready_o.value == 1
+        assert valid_o.value == 0
+        await FallingEdge(clk_i)
+        assert load_ready_o.value == 1
+        assert valid_o.value == 0
+        await FallingEdge(clk_i)
+    
 
 tests = [
     'test_simple'

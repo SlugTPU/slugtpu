@@ -36,6 +36,9 @@ test_relu_n:
 test_pe_col:
 	python3 -m pytest sim/test_pe_col.py -s
 
+test_scalar_pipe:
+	python3 -m pytest sim/test_scalar_pipe.py -s
+
 clean:
 	rm -rf sim_build
 

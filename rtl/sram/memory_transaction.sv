@@ -54,6 +54,7 @@ module memory_transaction #(
             current_count_q <= '0;
             transaction_amount_q <= transaction_amount_i;
             in_use <= '1; 
+            addr_o <= '0;
         end else begin
             current_count_q <= current_count_d;           
             addr_o <= addr_d;
