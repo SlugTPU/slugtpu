@@ -1,0 +1,8 @@
+<testsuites name="results">
+  <testsuite name="all" package="all">
+    <property name="random_seed" value="1772505041" />
+    <testcase name="test_basic_flow" classname="test_pe_col" file="/home/shreyasg0110/tpu/slugtpu/rtl/pe_test/col/test_pe_col.py" lineno="47" time="0.0024671554565429688" sim_time_ns="55.0" ratio_time="22292.87978353305">
+      <failure error_type="AssertionError" error_msg="FAIL: expected 38, got 10&#10;assert 10 == 38" />
+    </testcase>
+  </testsuite>
+</testsuites>
