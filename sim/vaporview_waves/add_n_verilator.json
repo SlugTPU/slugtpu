@@ -1,10 +1,14 @@
 {
   "extensionVersion": "1.5.0",
   "fileName": "/Users/raph/slugtpu/sim_build/verilator/test_add_n/add_n_simple_test/dump.fst",
-  "markerTime": null,
+  "markerTime": 115000,
   "altMarkerTime": null,
-  "selectedSignal": null,
-  "zoomRatio": 0.00870425871120817,
+  "selectedSignal": {
+    "name": "add_n.data_o.[0]",
+    "msb": 31,
+    "lsb": 0
+  },
+  "zoomRatio": 0.0038623046875,
   "scrollLeft": 42967,
   "displayedSignals": [
     {

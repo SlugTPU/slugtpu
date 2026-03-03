@@ -1,6 +1,6 @@
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge
+from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge, ReadOnly, ReadWrite
 from cocotb.types import Logic
 from cocotb.handle import LogicObject
 import random
@@ -26,8 +26,8 @@ async def handshake(clk_i: LogicObject, rst_i: LogicObject,ready: LogicObject, v
     while True:
         await RisingEdge(clk_i)
         if not is_resetting(rst_i.value):
-            cocotb.log.info(f"Checking reset: rst_i={rst_i.value}")
             assert ready.value.is_resolvable and valid.value.is_resolvable, "Handshake signals must be resolvable"
+            # cocotb.log.debug(f"Handshake check: ready={ready.value}, valid={valid.value}")
             if (ready.value == 1 and valid.value == 1):
                 break
 
