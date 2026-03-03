@@ -11,40 +11,16 @@ from collections import deque
 import random
 from shared import handshake
 
-def logic_mul(a: LogicArray, b: LogicArray, width: int) -> LogicArray:
-    """
-    Multiplies two LogicArrays, returning the logic array with the given width. 
 
-    Assumes inputs are signed and returns a signed result.
-    """
-    res = (a.to_signed() * b.to_signed())
-    return LogicArray.from_signed(res, width)
+def float_to_fixed(f_val, frac_bits):
+    """Converts a float to a fixed-point integer."""
+    scaling_factor = 1 << frac_bits 
+    return int(f_val * scaling_factor + 0.5)
 
-def quantized_mul_n(data_i: Array[LogicArray], m0_i: Array[LogicArray], ACC_WIDTH_P: int, M0_WIDTH_P: int, FIXED_SHIFT_P: int, N: int) -> Array[LogicArray]:
-    """Multiplies N elements of data_i by m0_i, returning the quantized 8-bit result"""
-
-    prod_width = ACC_WIDTH_P + M0_WIDTH_P
-    result = Array([0 for _ in range(N)], N)
-    for i in range(N):
-        # 1. Multiply (producing ACC_WIDTH_P + M0_WIDTH_P bit result)
-        r = logic_mul(data_i[i].value, m0_i[i].value, prod_width).to_unsigned()
-        # 2. Add rounding constant (0.5 in fixed point representation
-        r = r + (1 << (FIXED_SHIFT_P - 1))
-        # 3. Shift right by FIXED_SHIFT_P bits to translate to fixed point representation
-        r = r >> FIXED_SHIFT_P
-        # 4. Saturate to 8 bits
-        # r = max(-128, min(127, r))
-        if (r > 127):
-            r = 127
-        elif (r < -128):
-            r = 128
-        else:
-            pass
-
-        result[i] = LogicArray.from_signed(r, 8)
-
-    return result
-    
+def fixed_to_float(fixed_val, frac_bits):
+    """Converts a fixed-point integer back to a float."""
+    scaling_factor = 1 << frac_bits
+    return float(fixed_val) / scaling_factor
 
 class mul_n_model():
     def __init__(self, N, width=8):
@@ -54,18 +30,22 @@ class mul_n_model():
         self.q = deque(maxlen=1)
 
     def consume(self, dut):
-        self.q.append((dut.data_i, dut.m0_i))
+        self.q.append((dut.data_i.value, dut.m0_i.value))
 
     def produce(self, dut):
         data_o = dut.data_o
         inp_n, m0_n = self.q.popleft()
-        expected = quantized_mul_n(inp_n, m0_n, dut.ACC_WIDTH_P.value.to_unsigned(), dut.M0_WIDTH_P.value.to_unsigned(), dut.FIXED_SHIFT_P.value.to_unsigned(), self.N)
+        FIXED_SHIFT_P = dut.FIXED_SHIFT_P.value
+        # expected = quantized_mul_n(inp_n, m0_n, dut.ACC_WIDTH_P.value.to_unsigned(), dut.M0_WIDTH_P.value.to_unsigned(), dut.FIXED_SHIFT_P.value.to_unsigned(), self.N)
 
         for i in range(self.N):
             got = data_o[i].value.to_signed()
-            expected_val = expected[i].to_signed()
-            cocotb.log.info(f"Producing with input {dut.data_i[i].value.to_signed()} and m0 {dut.m0_i[i].value.to_signed()}: got {got}, expected {expected_val}")
-            assert got == expected_val, f"Expected {expected_val}, got {got}"
+            expected = inp_n[i].to_signed() * fixed_to_float(m0_n[i].to_signed(), FIXED_SHIFT_P.to_unsigned())
+
+            cocotb.log.info(f"Producing with input {dut.data_i[i].value.to_signed()} and m0 {dut.m0_i[i].value.to_signed()}: got {got}, expected {expected}")
+            # check for accuracy
+            assert abs(got - expected) < 0.5, f"Output mismatch at index {i}: got {got}, expected {expected}"
+
 
 class ModelRunner():
     def __init__(self, dut):
