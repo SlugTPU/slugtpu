@@ -25,9 +25,7 @@ module quantizer_mul #(
     assign shifted = rounded >>> FIXED_SHIFT;
 
     // Output truncated with saturation
-    always_comb begin
-        if (shifted > 127)       q_out = 8'sd127;
-        else if (shifted < -128) q_out = -8'sd128;
-        else                     q_out = shifted[7:0];
-    end
+    assign q_out  = (shifted > 127) ?   8'sd127 :
+                    (shifted < -128) ? -8'sd128 :
+                    shifted[7:0];
 endmodule

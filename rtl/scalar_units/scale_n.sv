@@ -1,9 +1,10 @@
 module scale_n
     #(parameter N = 8
     , parameter ACC_WIDTH_P = 32
-    , parameter M0_WIDTH_P = 32,
+    , parameter M0_WIDTH_P = 32
     // hardcoded for 8-bit output, but can be parameterized if needed
-    , parameter Q_WIDTH_P = 8)
+    , parameter Q_WIDTH_P = 8
+    , parameter FIXED_SHIFT_P = 16)
     (
     input logic clk_i,
     input logic rst_i,
@@ -17,7 +18,6 @@ module scale_n
     output logic signed [Q_WIDTH_P-1:0] data_o [N-1:0]
 );
 
-
     logic signed [Q_WIDTH_P-1:0] data_r [N-1:0];
     genvar i;
     generate
@@ -25,7 +25,7 @@ module scale_n
             quantizer_mul
                 #(.ACC_WIDTH(ACC_WIDTH_P),
                 .M0_WIDTH(M0_WIDTH_P),
-                .Q_WIDTH(Q_WIDTH_P))
+                .FIXED_SHIFT(FIXED_SHIFT_P))
             quantizer_mul_inst
                 (.psum(data_i[i]),
                 .m0(m0_i[i]),
