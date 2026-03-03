@@ -11,48 +11,46 @@ from collections import deque
 import random
 from shared import handshake
 
-def logic_add(a: LogicArray, b: LogicArray, width: int) -> LogicArray:
-    """
-    Adds two LogicArrays, returning the logic array with the given width. 
 
-    Assumes inputs are signed and returns a signed result.
-    """
-    res = (a.to_signed() + b.to_signed())
-    return LogicArray.from_signed(res, width)
+def float_to_fixed(f_val, frac_bits):
+    """Converts a float to a fixed-point integer."""
+    scaling_factor = 1 << frac_bits 
+    return int(f_val * scaling_factor + 0.5)
 
-def add_n(data_i: Array[LogicArray], bias_i: Array[LogicArray], N: int, width: int) -> Array[LogicArray]:
-    """Adds N elements of data_i to bias_i."""
-    result = Array([], N)
-    for i in range(N):
-        result[i] = logic_add(data_i[i], bias_i[i], width)
-    return result
+def fixed_to_float(fixed_val, frac_bits):
+    """Converts a fixed-point integer back to a float."""
+    scaling_factor = 1 << frac_bits
+    return float(fixed_val) / scaling_factor
 
-# add_n is an elastic module that takes in N elements of data and bias, adds them together, and produces N elements of output.
-class add_n_model():
-    def __init__(self, N: int, width: int):
+class mul_n_model():
+    def __init__(self, N, width=8):
         self.N = N
+        # Assume width is 8 bits for quantization
         self.width = width
         self.q = deque(maxlen=1)
 
     def consume(self, dut):
-        cocotb.log.info(f"Consuming input: data_i={[dut.data_i[i].value for i in range(self.N)]}, bias_i={[dut.bias_i[i].value for i in range(self.N)]}")
-        self.q.append((dut.data_i, dut.bias_i))
+        self.q.append((dut.data_i.value, dut.m0_i.value))
 
     def produce(self, dut):
         data_o = dut.data_o
-
-        got_n = data_o
-        inp_n, bias_n = self.q.popleft()
+        inp_n, m0_n = self.q.popleft()
+        FIXED_SHIFT_P = dut.FIXED_SHIFT_P.value
+        # expected = quantized_mul_n(inp_n, m0_n, dut.ACC_WIDTH_P.value.to_unsigned(), dut.M0_WIDTH_P.value.to_unsigned(), dut.FIXED_SHIFT_P.value.to_unsigned(), self.N)
 
         for i in range(self.N):
-            res = logic_add(inp_n[i].value, bias_n[i].value, self.width)
-            # cocotb.log.info(f"Expected {res}, got {got_n[i]}")
-            assert got_n[i].value == res, f"Expected {res}, got {got_n[i]}"
+            got = data_o[i].value.to_signed()
+            expected = inp_n[i].to_signed() * fixed_to_float(m0_n[i].to_signed(), FIXED_SHIFT_P.to_unsigned())
+
+            cocotb.log.info(f"Producing with input {dut.data_i[i].value.to_signed()} and m0 {dut.m0_i[i].value.to_signed()} ({fixed_to_float(dut.m0_i[i].value.to_unsigned(), FIXED_SHIFT_P.to_unsigned())})): got {got}, expected {expected}")
+            # check for accuracy
+            assert abs(got - expected) < 0.5, f"Output mismatch at index {i}: got {got}, expected {expected}"
+
 
 class ModelRunner():
     def __init__(self, dut):
         self.dut = dut
-        self.model = add_n_model(dut.N.value.to_unsigned(), dut.width_p.value.to_unsigned())
+        self.model = mul_n_model(dut.N.value.to_unsigned())
 
     def start(self):
         cocotb.start_soon(self.run_input())
@@ -66,7 +64,6 @@ class ModelRunner():
 
         while True:
             await handshake(clk_i, rst_i, ready_o, valid_i)
-            cocotb.log.info("Input handshake successful, consuming input")
             self.model.consume(self.dut)
 
     async def run_output(self):
@@ -95,15 +92,15 @@ async def reset_test(dut):
 
 
 @cocotb.test()
-async def add_n_simple_test(dut):
+async def scale_n_simple_test(dut):
     clk_i = dut.clk_i
     rst_i = dut.rst_i
-    bias_i = dut.bias_i
     data_i = dut.data_i
+    m0_i = dut.m0_i
     data_valid_i = dut.data_valid_i
     data_ready_i = dut.data_ready_i
     N = dut.N
-    width_p = dut.width_p
+    FIXED_SHIFT_P = dut.FIXED_SHIFT_P
     m = ModelRunner(dut)
 
     await clock_start(clk_i)
@@ -117,7 +114,7 @@ async def add_n_simple_test(dut):
     data_valid_i.value = 1
 
     for i in range(N.value):
-        bias_i[i].value = random.randint(-10, 10)
+        m0_i[i].value = random.randint(0, 10) << FIXED_SHIFT_P.value.to_unsigned()
         data_i[i].value = random.randint(-10, 10)
 
     await RisingEdge(dut.clk_i)
@@ -128,19 +125,19 @@ async def add_n_simple_test(dut):
     await FallingEdge(dut.clk_i)
 
 
-tests = ["reset_test", "add_n_simple_test"]
+tests = ["reset_test", "scale_n_simple_test"]
 proj_path = Path("./rtl").resolve()
-sources = [ proj_path/"utils/elastic.sv", proj_path/"scalar_units/add_n.sv"   ]
+sources = [ proj_path/"utils/elastic.sv", proj_path/"scalar_units/scale_n.sv", proj_path/"quantizer_mul.sv"]
 
 @pytest.mark.parametrize("testcase", tests)
-def test_add_n_each(testcase):
+def test_scale_n_each(testcase):
     """Runs each test independently. Continues on test failure"""
-    run_test(parameters={}, sources=sources, module_name="test_add_n", hdl_toplevel="add_n", testcase=testcase)
+    run_test(parameters={}, sources=sources, module_name="test_scale_n", hdl_toplevel="scale_n", testcase=testcase)
 
-def test_add_all():
+def test_scale_n_all():
     """Runs each test sequentially as one giant test."""
 
     # debug print parameters can be idea if a simulator fails silently without telling you why
     # print(f"DEBUG PARAMETERs: {depth_p}")
 
-    run_test(parameters={}, sources=sources, module_name="test_add_n", hdl_toplevel="add_n")
+    run_test(parameters={}, sources=sources, module_name="test_scale_n", hdl_toplevel="scale_n")
