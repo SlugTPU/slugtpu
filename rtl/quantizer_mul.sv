@@ -7,7 +7,7 @@ module quantizer_mul #(
     parameter int M0_WIDTH =32 
 )(
     input  logic signed [ACC_WIDTH-1:0] psum,
-    input  logic signed [M0_WIDTH-1:0] m0,
+    input  logic [M0_WIDTH-1:0] m0,
     output logic signed [7:0]  q_out
 );
 
@@ -16,7 +16,7 @@ module quantizer_mul #(
     logic signed [ACC_WIDTH+M0_WIDTH-1:0] shifted;
 
     // Multiply
-    assign product = psum * m0;
+    assign product = psum * $signed({ 1'b0, m0 });
 
     // Fixed Rounding (effective adds +0.5 to shifted result)
     assign rounded = product + (1 << (FIXED_SHIFT - 1));

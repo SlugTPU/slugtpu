@@ -42,7 +42,7 @@ class mul_n_model():
             got = data_o[i].value.to_signed()
             expected = inp_n[i].to_signed() * fixed_to_float(m0_n[i].to_signed(), FIXED_SHIFT_P.to_unsigned())
 
-            cocotb.log.info(f"Producing with input {dut.data_i[i].value.to_signed()} and m0 {dut.m0_i[i].value.to_signed()}: got {got}, expected {expected}")
+            cocotb.log.info(f"Producing with input {dut.data_i[i].value.to_signed()} and m0 {dut.m0_i[i].value.to_signed()} ({fixed_to_float(dut.m0_i[i].value.to_unsigned(), FIXED_SHIFT_P.to_unsigned())})): got {got}, expected {expected}")
             # check for accuracy
             assert abs(got - expected) < 0.5, f"Output mismatch at index {i}: got {got}, expected {expected}"
 
@@ -114,7 +114,7 @@ async def scale_n_simple_test(dut):
     data_valid_i.value = 1
 
     for i in range(N.value):
-        m0_i[i].value = random.randint(-10, 10) << FIXED_SHIFT_P.value.to_unsigned()
+        m0_i[i].value = random.randint(0, 10) << FIXED_SHIFT_P.value.to_unsigned()
         data_i[i].value = random.randint(-10, 10)
 
     await RisingEdge(dut.clk_i)
