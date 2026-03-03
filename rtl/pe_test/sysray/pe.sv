@@ -34,7 +34,9 @@ module pe #(
 
     // edge_detector for weight sel
     always_ff @(posedge clk_i) begin
-        if (weight_edge)
+        if (rst_i)
+            prev_weight_sel <= '0;
+        else if (weight_edge)
             prev_weight_sel <= weight_sel;
     end
 
@@ -60,8 +62,13 @@ module pe #(
 
     // pass through activation
     always_ff @(posedge clk_i) begin
-        act_out <= act_in;
-        act_valid_o <= act_valid;
+        if (rst_i) begin
+            act_out <= '0;
+            act_valid_o <= '0;
+        end else begin
+            act_out <= act_in;
+            act_valid_o <= act_valid;
+        end
     end
 
     assign weight_out = weight_buf[prev_weight_sel];

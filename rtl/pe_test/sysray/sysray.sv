@@ -38,7 +38,7 @@ module sysray #(
     .weight_valid_o(weight_valid00_out),
     .act_valid(act_valid0),
     .act_valid_o(act_valid00_out),
-    .psum_in(),
+    .psum_in({ACC_WIDTH{1'b0}}),
     .psum_out(psum_00_out)
   );
 
@@ -57,7 +57,7 @@ module sysray #(
     .weight_valid_o(weight_valid01_out),
     .act_valid(act_valid00_out),
     .act_valid_o(),
-    .psum_in(),
+    .psum_in({ACC_WIDTH{1'b0}}),
     .psum_out(psum_01_out)
   );
 
@@ -95,6 +95,9 @@ module sysray #(
     .act_valid_o(),
     .psum_in(psum_01_out),
     .psum_out(psum_11_out)
-  ); 
-     
-endmodule  
+  );
+
+  assign psum_out1 = psum_10_out;
+  assign psum_out2 = psum_11_out;
+
+endmodule
