@@ -21,4 +21,9 @@ python3 -m pip install --force-reinstall --no-binary cocotb cocotb
 # Test fifo
 make test_fifo
 ```
-
+6. Waveforms
+Waveforms are automatically generated in sim_build/ after running make. 
+To open a waveform:
+```
+gtkwave sim_build/icarus/test_fifo/fifo_simple_test/*/fifo.fst
+```
