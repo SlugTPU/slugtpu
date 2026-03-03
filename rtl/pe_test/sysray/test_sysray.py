@@ -146,3 +146,20 @@ async def test_basic_flow(dut):
     assert psum2 == expected2, f"[C7 psum_out2] Expected {expected2}, got {psum2}"
     cocotb.log.info(f"PASS: C7 psum_out2  expected={expected2}  got={psum2}")
 
+    #-------------------------------------------------------------------
+    # C8:
+    # ------------------------------------------------------------------- 
+    await FallingEdge(dut.clk_i)
+    
+    cocotb.log.info(f"psum_out1 raw = {dut.psum_out1.value}")
+    psum1 = int(dut.psum_out1.value)
+    expected1 = AP11 * WP10 + AP10 * WP00
+    assert psum1 == expected1, f"[C8 psum_out1] Expected {expected1}, got {psum1}"
+    cocotb.log.info(f"PASS: C8 psum_out1 expected={expected1}  got={psum1}")
+    
+    cocotb.log.info(f"psum_out2 raw = {dut.psum_out2.value}")
+    psum2 = int(dut.psum_out2.value)
+    expected2 = AP01 * WP11 + AP00 * WP01
+    assert psum2 == expected2, f"[C8 psum_out2] Expected {expected2}, got {psum2}"
+    cocotb.log.info(f"PASS: C8 psum_out2  expected={expected2}  got={psum2}")
+
