@@ -35,6 +35,7 @@ class add_n_model():
         self.q = deque()
 
     def consume(self, dut):
+        cocotb.log.info(f"Debug: got data_i={[dut.data_i[i].value for i in range(self.N)]}, bias_i={[dut.bias_i[i].value for i in range(self.N)]}")
         cocotb.log.info(f"Consuming input: data_i={[dut.data_i[i].value.to_signed() for i in range(self.N)]}, bias_i={[dut.bias_i[i].value.to_signed() for i in range(self.N)]}")
         data_snapshot = [dut.data_i[i].value for i in range(self.N)]
         bias_snapshot = [dut.bias_i[i].value for i in range(self.N)]
@@ -76,17 +77,21 @@ class InputModel():
 
         # stream random
         for (d, b) in self.data_generator:
-            valid_i.value = next(self.handshake_generator)
             tx = False
-            while (valid_i.value == 1 and not tx):
-                for i in range(self.N):
-                    data_i[i].value = d[i]
-                    bias_i[i].value = b[i]
+
+            for i in range(self.N):
+                data_i[i].value = d[i]
+                bias_i[i].value = b[i]
+
+            while (not tx):
+                valid_i.value = next(self.handshake_generator)
+
+                await RisingEdge(clk_i)
+
                 cocotb.log.info(f"Tx input: data_i={[data_i[i].value.to_signed() for i in range(self.N)]}, bias_i={[bias_i[i].value.to_signed() for i in range(self.N)]}")
-                if ready_o.value:
+                if valid_i.value and ready_o.value == 1:
                     self.nin += 1
                     tx = True
-                await RisingEdge(clk_i)
             await FallingEdge(clk_i)
 
 class OutputModel():
@@ -111,13 +116,13 @@ class OutputModel():
         await FallingEdge(rst_i)
 
         while self.nout < self.total_nin:
-            ready_i.value = next(self.handshake_generator)
             rx = False
-            while (ready_i.value == 1 and not rx):
-                if valid_o.value:
+            while (not rx):
+                ready_i.value = next(self.handshake_generator)
+                await RisingEdge(clk_i)
+                if valid_o.value == 1:
                     self.nout += 1
                     rx = True
-                await RisingEdge(clk_i)
             await FallingEdge(clk_i)
 
 class ModelRunner():
@@ -153,7 +158,7 @@ class ModelRunner():
         await FallingEdge(rst_i)
 
         while True:
-            cocotb.log.info("Waiting for output handshake...")
+            cocotb.log.info(f"Waiting for output handshake..., ready_i={ready_i.value}, valid_o={valid_o.value}, valid_i={valid_i.value}, ready_o={ready_o.value}")
             # await handshake(clk_i, rst_i, ready_i, valid_o)
             await RisingEdge(clk_i)
             if (ready_i.value == 1 and valid_o.value == 1):
@@ -225,8 +230,7 @@ async def add_n_random_backpressure(dut):
 
     def generate_backpressure() -> Iterator[bool]:
         while True:
-            yield True
-            # yield random.choice([True, False])
+            yield random.choice([True, False])
 
     m = ModelRunner(dut)
     im = InputModel(dut, generate_data(), generate_backpressure(), N.value.to_unsigned(), width_p.value.to_unsigned())
@@ -241,6 +245,8 @@ async def add_n_random_backpressure(dut):
 
     await task_om.complete
     await FallingEdge(clk_i)
+    dut.data_ready_i.value = 0
+    dut.data_valid_i.value = 0
 
 
 tests = ["reset_test", "add_n_simple_test", "add_n_random_backpressure"]
