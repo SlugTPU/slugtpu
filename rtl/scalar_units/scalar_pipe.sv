@@ -101,43 +101,61 @@ module scalar_pipe #(
 
     // s4: fixed-point scale + quantize to int8
 
-    logic signed [7:0] scale_comb [N-1:0];
+    scale_n #(
+        .N          (N),
+        .ACC_WIDTH_P (PSUM_W),
+        .M0_WIDTH_P  (M0_W),
+        .FIXED_SHIFT_P(FIXED_SHIFT)
+    ) u_scale_n (
+        .clk_i       (clk_i),
+        .rst_i       (rst_i),
+        .m0_i        (scale_i),
+        .data_valid_i(zp_valid),
+        .data_ready_i(data_ready_i),
+        .data_i      (zp_data),
+        .data_valid_o(data_valid_o),
+        .data_ready_o(zp_ready),
+        .data_o      (data_o)
+    );
 
-    for (genvar i = 0; i < N; i++) begin : gen_qmul
-        localparam int PW = PSUM_W + M0_W;
+    // logic signed [7:0] scale_comb [N-1:0];
 
-        logic signed [PW-1:0] product;
-        logic signed [PW-1:0] rounded;
-        logic signed [PW-1:0] shifted;
+    // for (genvar i = 0; i < N; i++) begin : gen_qmul
+    //     localparam int PW = PSUM_W + M0_W;
 
-        assign product = zp_data[i] * scale_i[i];
-        assign rounded = product + (1 <<< (FIXED_SHIFT - 1));
-        assign shifted = rounded >>> FIXED_SHIFT;
+    //     logic signed [PW-1:0] product;
+    //     logic signed [PW-1:0] rounded;
+    //     logic signed [PW-1:0] shifted;
 
-        assign scale_comb[i] = (shifted > 127)  ? 8'sd127  :
-                                (shifted < -128) ? -8'sd128 :
-                                shifted[7:0];
-    end
+    //     assign product = zp_data[i] * scale_i[i];
+    //     assign rounded = product + (1 <<< (FIXED_SHIFT - 1));
+    //     assign shifted = rounded >>> FIXED_SHIFT;
+
+    //     assign scale_comb[i] = (shifted > 127)  ? 8'sd127  :
+    //                             (shifted < -128) ? -8'sd128 :
+    //                             shifted[7:0];
+    // end
+
 
     // elastic output reg (like relu_n)
-    assign zp_ready = ~data_valid_o | data_ready_i;
+    // assign zp_ready = ~data_valid_o | data_ready_i;
 
-    for (genvar i = 0; i < N; i++) begin : gen_out_reg
-        always_ff @(posedge clk_i) begin
-            if (rst_i) begin
-                data_o[i] <= '0;
-            end else if (zp_ready) begin
-                data_o[i] <= scale_comb[i];
-            end
-        end
-    end
+    // for (genvar i = 0; i < N; i++) begin : gen_out_reg
+    //     always_ff @(posedge clk_i) begin
+    //         if (rst_i) begin
+    //             data_o[i] <= '0;
+    //         end else if (zp_ready) begin
+    //             data_o[i] <= scale_comb[i];
+    //         end
+    //     end
+    // end
 
-    always_ff @(posedge clk_i) begin
-        if (rst_i) begin
-            data_valid_o <= 1'b0;
-        end else if (zp_ready) begin
-            data_valid_o <= zp_valid;
-        end
-    end
+    // always_ff @(posedge clk_i) begin
+    //     if (rst_i) begin
+    //         data_valid_o <= 1'b0;
+    //     end else if (zp_ready) begin
+    //         data_valid_o <= zp_valid;
+    //     end
+    // end
 
 endmodule
