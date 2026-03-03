@@ -1,10 +1,13 @@
+/* Implementation of quantizer multiplication step (scaled by m0) for 8-bit quantization output
+ *  Note: Currently is hardcoded for 8-bit output, but can be parameterized if needed
+*/
 module quantizer_mul #(
     parameter int ACC_WIDTH = 32,
     parameter int FIXED_SHIFT = 16,
     parameter int M0_WIDTH =32 
 )(
     input  logic signed [ACC_WIDTH-1:0] psum,
-    input  logic signed [M0_WIDTH-1:0] m0,
+    input  logic [M0_WIDTH-1:0] m0,
     output logic signed [7:0]  q_out
 );
 
@@ -13,17 +16,16 @@ module quantizer_mul #(
     logic signed [ACC_WIDTH+M0_WIDTH-1:0] shifted;
 
     // Multiply
-    assign product = psum * m0;
+    assign product = psum * $signed({ 1'b0, m0 });
 
     // Fixed Rounding (effective adds +0.5 to shifted result)
     assign rounded = product + (1 << (FIXED_SHIFT - 1));
 
+    // Shift to convert from integer representation to fixed point representation
     assign shifted = rounded >>> FIXED_SHIFT;
 
-    // Saturation
-    always_comb begin
-        if (shifted > 127)       q_out = 8'sd127;
-        else if (shifted < -128) q_out = -8'sd128;
-        else                     q_out = shifted[7:0];
-    end
+    // Output truncated with saturation
+    assign q_out  = (shifted > 127) ?   8'sd127 :
+                    (shifted < -128) ? -8'sd128 :
+                    shifted[7:0];
 endmodule

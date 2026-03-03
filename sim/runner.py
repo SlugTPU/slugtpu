@@ -25,7 +25,6 @@ def run_test(parameters, sources, module_name, hdl_toplevel, testcase=None, sims
         # extra stuff specifically for verilator
         if (sim == "verilator"):
             build_args.append("--trace-fst")
-            # build_args.append("--timing")
 
         runner = get_runner(sim)
         runner.build(
@@ -36,8 +35,11 @@ def run_test(parameters, sources, module_name, hdl_toplevel, testcase=None, sims
             build_dir=build_dir,
             parameters=parameters,
             build_args=build_args,
+            verbose=True,
             waves=True
         )
 
-        runner.test(testcase=testcase, hdl_toplevel=hdl_toplevel, test_module=module_name)
+        print(f"Running test '{case_name}' with {sim}...")
+        print(f"Build command: {runner._build_command()}")
 
+        runner.test(testcase=testcase, hdl_toplevel=hdl_toplevel, test_module=module_name)

@@ -43,12 +43,12 @@ class ModelRunner():
 
     async def run_input(self):
         while True:
-            await handshake(self.clk_i, self.valid_i, self.ready_o)
+            await handshake(self.clk_i, self.rst_i, self.ready_o, self.valid_i)
             self.model.consume(self.dut)
 
     async def run_output(self):
         while True:
-            await handshake(self.clk_i, self.valid_o, self.ready_i)
+            await handshake(self.clk_i, self.rst_i, self.ready_i, self.valid_o)
             self.model.produce(self.dut)
 
 # model for streaming n elements with or without backpressure
@@ -156,10 +156,10 @@ async def fifo_simple_test(dut):
     m = FifoModel()
     r = ModelRunner(dut, m)
 
-    r.start()
-
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
+
+    r.start()
 
     await FallingEdge(rst_i)
     valid_i.value = 1
@@ -180,6 +180,10 @@ async def fifo_simple_test(dut):
     for _ in range(2 ** depth_log2_p.value.to_unsigned() - 1):
         await RisingEdge(clk_i)
         await FallingEdge(clk_i)
+
+    await FallingEdge(clk_i)
+    ready_i.value = 0
+    await FallingEdge(clk_i)
 
 @cocotb.test()
 @cocotb.parametrize(with_pressure=[False, True])

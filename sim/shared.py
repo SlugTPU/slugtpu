@@ -1,6 +1,8 @@
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge
+from cocotb.triggers import RisingEdge, ClockCycles, FallingEdge, ReadOnly, ReadWrite
+from cocotb.types import Logic
+from cocotb.handle import LogicObject
 import random
 
 async def clock_start(clk_i, period_ns=10):
@@ -16,11 +18,18 @@ async def reset_sequence(clk_i, rst_i, num_cycles=10):
     await FallingEdge(clk_i)
     rst_i.value = 0
 
-async def handshake(clk_i, ready, valid):
+def is_resetting(rst_i: Logic):
+    """Check if in reset"""
+    return rst_i.is_resolvable and rst_i == 1
+
+async def handshake(clk_i: LogicObject, rst_i: LogicObject,ready: LogicObject, valid: LogicObject):
     while True:
         await RisingEdge(clk_i)
-        if (ready.value == 1 and valid.value == 1):
-            break
+        if not is_resetting(rst_i.value):
+            assert ready.value.is_resolvable and valid.value.is_resolvable, "Handshake signals must be resolvable"
+            # cocotb.log.debug(f"Handshake check: ready={ready.value}, valid={valid.value}")
+            if (ready.value == 1 and valid.value == 1):
+                break
 
 # stringifies a dict with string keys and integer values into path-safe names
 def stringify_dict(dic):
