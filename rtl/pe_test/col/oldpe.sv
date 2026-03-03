@@ -57,7 +57,7 @@ module pe #(
         if (rst_i)
             psum_out <= '0;
       else if (act_valid)
-            psum_out <= psum_in + (act_in * active_weight);
+            psum_out <= psum_in + (act_in[DATA_WIDTH-1:0] * active_weight);
     end
 
     // pass through activation

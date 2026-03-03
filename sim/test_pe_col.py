@@ -115,7 +115,113 @@ async def test_basic_flow(dut):
     assert got == expected, f"FAIL: expected {expected}, got {got}"
     cocotb.log.info("PASS: test_basic_flow")
 
-tests = ["test_basic_flow"]
+@cocotb.test()
+async def test_multitile_flow(dut):
+    """
+    Load two unique weights via shift + latch, then compute.
+
+    W2 = 2 -> PE0 (top) A00= 5
+    W1 = 7 -> PE1 (bottom) A10 = 4
+
+    Expected psum_out = W2*A00 + W1*A10 = 2*5 + 7*4 = 10 + 28 = 38
+    """
+    cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
+    await do_reset(dut)
+
+    await FallingEdge(dut.clk_i)
+    W1 = 7 # for PE1 (bottom), sent first so it shifts down
+    W2 = 2 # for PE0 (top), sent second, stays at top
+    A00 = 5
+    A10 = 4
+
+    W3 = 1
+    W4 = 3
+    A1_0 = 6
+    A1_1 = 7
+
+    dut.weight_in.value = W1
+    dut.weight_valid.value = 1
+    dut.act0_in.value = 0
+    dut.act1_in.value = 0
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 0
+    dut.psum_in.value = 0
+    await FallingEdge(dut.clk_i)
+
+    dut.weight_in.value    = W2
+    dut.weight_valid.value = 1
+    await FallingEdge(dut.clk_i)
+
+    # C1
+    dut.weight_in.value     = W3 | 1<<8
+    dut.act0_in.value = A00
+    dut.act1_in.value = 0
+    dut.act0_valid.value = 1
+    dut.act1_valid.value = 0
+    await FallingEdge(dut.clk_i)
+    # PE0.psum_out = 0 + A00*W2
+
+    # C2
+    dut.weight_in.value     = W4 | 1<<8
+    dut.act0_in.value = 0
+    dut.act1_in.value = A10
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 1
+    await FallingEdge(dut.clk_i)
+    
+    dut.weight_valid.value = 1
+    dut.weight_in.value     = W3
+    dut.act0_in.value = A1_0 | 1<<8
+    dut.act1_in.value = 0
+    dut.act0_valid.value = 1
+    dut.act1_valid.value = 0
+    await FallingEdge(dut.clk_i)
+
+    got = int(dut.psum_out.value)
+    expected = W2 * A00 + W1 * A10
+    cocotb.log.info(f"psum_out = {got},  expected = {expected}")
+    assert got == expected, f"FAIL: expected {expected}, got {got}"
+
+    dut.act0_in.value = 0
+    dut.weight_in.value     = W4
+    dut.act1_in.value = A1_1 | 1 << 8
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 1
+    await FallingEdge(dut.clk_i)
+
+    dut.weight_valid.value = 0
+    dut.act0_in.value = A00
+    dut.act1_in.value = 0
+    dut.act0_valid.value = 1
+    dut.act1_valid.value = 0
+    await FallingEdge(dut.clk_i)
+
+    got = int(dut.psum_out.value)
+    expected = W3 * A1_1 + W4 * A1_0
+    cocotb.log.info(f"psum_out = {got},  expected = {expected}")
+    assert got == expected, f"FAIL: expected {expected}, got {got}"
+
+    dut.act0_in.value = 0
+    dut.act1_in.value = A10
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 1
+    await FallingEdge(dut.clk_i)
+
+    dut.act0_in.value = 0
+    dut.act1_in.value = 0
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 0
+    await FallingEdge(dut.clk_i)
+
+    got = int(dut.psum_out.value)
+    expected = W4 * A00 + W3 * A10
+    cocotb.log.info(f"psum_out = {got},  expected = {expected}")
+    assert got == expected, f"FAIL: expected {expected}, got {got}"
+
+    
+    cocotb.log.info("PASS: test_basic_flow")
+
+tests = ["test_basic_flow", "test_multitile_flow"]
 
 proj_path = Path("./rtl").resolve()
 sources = [ proj_path/"pe_test"/"col"/"oldpe.sv", proj_path/"pe_test"/"col"/"col_pe.sv" ]
