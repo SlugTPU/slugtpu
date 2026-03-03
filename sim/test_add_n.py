@@ -17,7 +17,7 @@ def logic_add(a: LogicArray, b: LogicArray, width: int) -> LogicArray:
 
     Assumes inputs are signed and returns a signed result.
     """
-    res = (a.to_signed() + b.to_signed()) & ((1 << width) - 1)
+    res = (a.to_signed() + b.to_signed())
     return LogicArray.from_signed(res, width)
 
 def add_n(data_i: Array[LogicArray], bias_i: Array[LogicArray], N: int, width: int) -> Array[LogicArray]:
@@ -29,26 +29,30 @@ def add_n(data_i: Array[LogicArray], bias_i: Array[LogicArray], N: int, width: i
 
 # add_n is an elastic module that takes in N elements of data and bias, adds them together, and produces N elements of output.
 class add_n_model():
-    def __init__(self, N, width):
+    def __init__(self, N: int, width: int):
         self.N = N
         self.width = width
         self.q = deque(maxlen=1)
 
     def consume(self, dut):
+        cocotb.log.info(f"Consuming input: data_i={[dut.data_i[i].value for i in range(self.N)]}, bias_i={[dut.bias_i[i].value for i in range(self.N)]}")
         self.q.append((dut.data_i, dut.bias_i))
 
     def produce(self, dut):
         data_o = dut.data_o
 
-        got = data_o.value.to_signed()
-        inp, bias = self.q.popleft()
-        expected = add_n(inp, bias, self.N, self.width).to_signed()
-        assert got == expected, f"Expected {expected}, got {got}"
+        got_n = data_o
+        inp_n, bias_n = self.q.popleft()
+
+        for i in range(self.N):
+            res = logic_add(inp_n[i].value, bias_n[i].value, self.width)
+            # cocotb.log.info(f"Expected {res}, got {got_n[i]}")
+            assert got_n[i].value == res, f"Expected {res}, got {got_n[i]}"
 
 class ModelRunner():
     def __init__(self, dut):
         self.dut = dut
-        self.model = add_n_model(dut.N, dut.width_p)
+        self.model = add_n_model(dut.N.value.to_unsigned(), dut.width_p.value.to_unsigned())
 
     def start(self):
         cocotb.start_soon(self.run_input())
@@ -62,7 +66,7 @@ class ModelRunner():
 
         while True:
             await handshake(clk_i, rst_i, ready_o, valid_i)
-            await ReadWrite()
+            cocotb.log.info("Input handshake successful, consuming input")
             self.model.consume(self.dut)
 
     async def run_output(self):
@@ -72,9 +76,10 @@ class ModelRunner():
         rst_i = self.dut.rst_i
 
         while True:
+            cocotb.log.info("Waiting for output handshake...")
             await handshake(clk_i, rst_i, ready_i, valid_o)
-            await ReadOnly()
             self.model.produce(self.dut)
+            cocotb.log.info("Output handshake successful, producing output")
 
 @cocotb.test()
 async def reset_test(dut):
@@ -86,6 +91,7 @@ async def reset_test(dut):
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
     await FallingEdge(rst_i)
+    cocotb.log.info("Reset complete")
 
 
 @cocotb.test()
@@ -98,9 +104,13 @@ async def add_n_simple_test(dut):
     data_ready_i = dut.data_ready_i
     N = dut.N
     width_p = dut.width_p
+    m = ModelRunner(dut)
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
+
+    m.start()
+
     await FallingEdge(rst_i)
 
     data_ready_i.value = 1
@@ -111,6 +121,12 @@ async def add_n_simple_test(dut):
         data_i[i].value = random.randint(-10, 10)
 
     await RisingEdge(dut.clk_i)
+
+    await FallingEdge(dut.clk_i)
+    data_ready_i.value = 1
+    data_valid_i.value = 0
+    await FallingEdge(dut.clk_i)
+
 
 tests = ["reset_test", "add_n_simple_test"]
 proj_path = Path("./rtl").resolve()
