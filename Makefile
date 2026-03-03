@@ -18,6 +18,9 @@ test_scalar_load:
 test_add_n:
 	python3 -m pytest sim/test_add_n.py -s
 
+test_scale_n:
+	python3 -m pytest sim/test_scale_n.py -s
+
 test_sram:
 	python3 -m pytest sim/test_sram.py -s
 	
@@ -38,6 +41,9 @@ test_pe_col:
 
 test_scalar_pipe:
 	python3 -m pytest sim/test_scalar_pipe.py -s
+
+test_scalar_stage:
+	python3 -m pytest sim/test_scalar_stage.py -s
 
 clean:
 	rm -rf sim_build

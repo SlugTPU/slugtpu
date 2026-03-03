@@ -139,6 +139,12 @@ async def test_multitile_flow(dut):
     A1_0 = 6
     A1_1 = 7
 
+    T1 = 7
+    T2 = 1
+
+    T3 = 4
+    T4 = 6
+
     dut.weight_in.value = W1
     dut.weight_valid.value = 1
     dut.act0_in.value = 0
@@ -162,61 +168,81 @@ async def test_multitile_flow(dut):
     # PE0.psum_out = 0 + A00*W2
 
     # C2
-    dut.weight_in.value     = W4 | 1<<8
-    dut.act0_in.value = 0
+    dut.weight_in.value = W4 | 1<<8
+    dut.act0_in.value = T1
     dut.act1_in.value = A10
-    dut.act0_valid.value = 0
-    dut.act1_valid.value = 1
-    await FallingEdge(dut.clk_i)
-    
-    dut.weight_valid.value = 1
-    dut.weight_in.value     = W3
-    dut.act0_in.value = A1_0 | 1<<8
-    dut.act1_in.value = 0
     dut.act0_valid.value = 1
-    dut.act1_valid.value = 0
+    dut.act1_valid.value = 1
     await FallingEdge(dut.clk_i)
 
     got = int(dut.psum_out.value)
     expected = W2 * A00 + W1 * A10
     cocotb.log.info(f"psum_out = {got},  expected = {expected}")
     assert got == expected, f"FAIL: expected {expected}, got {got}"
-
-    dut.act0_in.value = 0
-    dut.weight_in.value     = W4
-    dut.act1_in.value = A1_1 | 1 << 8
-    dut.act0_valid.value = 0
+    
+    dut.weight_valid.value = 1
+    dut.weight_in.value     = W3
+    dut.act0_in.value = A1_0 | 1<<8
+    dut.act1_in.value = T2
+    dut.act0_valid.value = 1
     dut.act1_valid.value = 1
     await FallingEdge(dut.clk_i)
 
-    dut.weight_valid.value = 0
-    dut.act0_in.value = A00
-    dut.act1_in.value = 0
-    dut.act0_valid.value = 1
-    dut.act1_valid.value = 0
-    await FallingEdge(dut.clk_i)
+    got = int(dut.psum_out.value)
+    expected = W2 * T1 + W1 * T2
+    cocotb.log.info(f"psum_out = {got},  expected = {expected}")
+    assert got == expected, f"FAIL: expected {expected}, got {got}"
 
+    dut.act0_in.value = T3 | 1<<8
+    dut.weight_in.value     = W4
+    dut.act1_in.value = A1_1 | 1 << 8
+    dut.act0_valid.value = 1
+    dut.act1_valid.value = 1
+    await FallingEdge(dut.clk_i)
+    
     got = int(dut.psum_out.value)
     expected = W3 * A1_1 + W4 * A1_0
     cocotb.log.info(f"psum_out = {got},  expected = {expected}")
     assert got == expected, f"FAIL: expected {expected}, got {got}"
 
-    dut.act0_in.value = 0
-    dut.act1_in.value = A10
-    dut.act0_valid.value = 0
+    dut.weight_valid.value = 0
+    dut.act0_in.value = A00
+    dut.act1_in.value = T4 | 1 << 8
+    dut.act0_valid.value = 1
     dut.act1_valid.value = 1
     await FallingEdge(dut.clk_i)
 
-    dut.act0_in.value = 0
-    dut.act1_in.value = 0
-    dut.act0_valid.value = 0
-    dut.act1_valid.value = 0
+    got = int(dut.psum_out.value)
+    expected = W3 * T4 + W4 * T3
+    cocotb.log.info(f"psum_out = {got},  expected = {expected}")
+    assert got == expected, f"FAIL: expected {expected}, got {got}"
+    
+
+    dut.act0_in.value = T1
+    dut.act1_in.value = A10
+    dut.act0_valid.value = 1
+    dut.act1_valid.value = 1
     await FallingEdge(dut.clk_i)
 
     got = int(dut.psum_out.value)
     expected = W4 * A00 + W3 * A10
     cocotb.log.info(f"psum_out = {got},  expected = {expected}")
     assert got == expected, f"FAIL: expected {expected}, got {got}"
+
+    
+
+    dut.act0_in.value = 0
+    dut.act1_in.value = T2
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 1
+    await FallingEdge(dut.clk_i)
+
+    got = int(dut.psum_out.value)
+    expected = W4 * T1 + W3 * T2
+    cocotb.log.info(f"psum_out = {got},  expected = {expected}")
+    assert got == expected, f"FAIL: expected {expected}, got {got}"
+
+    await FallingEdge(dut.clk_i)
 
     
     cocotb.log.info("PASS: test_basic_flow")
