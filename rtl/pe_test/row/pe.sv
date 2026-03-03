@@ -5,24 +5,37 @@ module pe #(
     input  logic                  clk_i,
     input  logic                  rst_i,
 
-    input  logic [DATA_WIDTH-1:0] act_in,
-    output logic [DATA_WIDTH-1:0] act_out,
+    input  logic [DATA_WIDTH:0] act_in, //top bit is select
+    output logic [DATA_WIDTH:0] act_out,
 
-    input  logic [DATA_WIDTH-1:0] weight_in,//shift reg chain
-    output logic [DATA_WIDTH-1:0] weight_out,
+    input  logic [DATA_WIDTH:0] weight_in, //shift reg chain
+    output logic [DATA_WIDTH:0] weight_out,
 
-    input logic weight_latch,
-    input logic buf_sel,
+    input  logic weight_valid,
+    output logic weight_valid_o,
+    
+    input  logic act_valid,
+    output logic act_valid_o,
 
     input  logic [ACC_WIDTH-1:0]  psum_in,
     output logic [ACC_WIDTH-1:0]  psum_out
 );
-    //double buff
-    logic [DATA_WIDTH-1:0] weight_buf [0:1];
 
-    // shift register passes weight data down the column
+    logic weight_sel, act_sel, weight_edge, prev_weight_sel;
+    assign weight_sel = weight_in[DATA_WIDTH];
+    assign act_sel = act_in[DATA_WIDTH];
+
+    assign weight_edge = prev_weight_sel != weight_sel;
+
+    assign weight_valid_o = weight_valid & ~weight_edge;
+
+    //double buff
+    logic [DATA_WIDTH:0] weight_buf [1:0];
+
+    // edge_detector for weight sel
     always_ff @(posedge clk_i) begin
-        weight_out <= weight_in;
+        if (weight_edge)
+            prev_weight_sel <= weight_sel;
     end
 
     // capture into shadow buffer only on broadcast latch
@@ -30,23 +43,27 @@ module pe #(
         if (rst_i) begin
             weight_buf[0] <= '0;
             weight_buf[1] <= '0;
-        end else if (weight_latch)
-            weight_buf[buf_sel] <= weight_in;
+            prev_weight_sel <= '0;
+        end else if (weight_valid)
+            weight_buf[weight_sel] <= weight_in;
     end
 
     logic [DATA_WIDTH-1:0] active_weight;
-    assign active_weight = weight_buf[~buf_sel];
+    assign active_weight = weight_buf[act_sel][DATA_WIDTH-1:0];
 
     always_ff @(posedge clk_i) begin
         if (rst_i)
             psum_out <= '0;
-        else
-            psum_out <= psum_in + (act_in * active_weight);
+      else if (act_valid)
+            psum_out <= psum_in + (act_in[DATA_WIDTH-1:0] * active_weight);
     end
 
     // pass through activation
     always_ff @(posedge clk_i) begin
         act_out <= act_in;
+        act_valid_o <= act_valid;
     end
+
+    assign weight_out = weight_buf[prev_weight_sel];
 
 endmodule
