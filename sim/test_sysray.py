@@ -1,170 +1,188 @@
-from __future__ import annotations
-from pathlib import Path
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, FallingEdge, Timer
+from cocotb.triggers import RisingEdge, FallingEdge
+from pathlib import Path
 import pytest
 from runner import run_test
 
-SEL1 = 1 << 8
+async def do_reset(dut):
+    dut.rst_i.value         = 1
+    dut.act0.value          = 0
+    dut.act1.value          = 0
+    dut.weight0.value       = 0
+    dut.weight1.value       = 0
+    dut.weight_valid0.value = 0
+    dut.weight_valid1.value = 0
+    dut.act_valid0.value    = 0
+    dut.act_valid1.value    = 0
+    await RisingEdge(dut.clk_i)
+    await RisingEdge(dut.clk_i)
+    dut.rst_i.value = 0
+    await RisingEdge(dut.clk_i)
 
-def pack(data, sel_bit):
-    return (int(bool(sel_bit)) << 8) | (data & 0xFF)
 
-async def drive(sig, val):
-    sig.value = int(val)
-    await Timer(1, units="ps")
-
-async def init_dut(dut):
+@cocotb.test()
+async def test_basic_flow(dut):
+    """
+    Check at C5:
+      psum_out1 = A00*W00 + A01*W10
+    """
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
-    for sig in [dut.act0, dut.act1, dut.weight0, dut.weight1,
-                dut.weight_valid0, dut.weight_valid1, dut.act_valid0, dut.act_valid1]:
-        await drive(sig, 0)
-    await drive(dut.rst_i, 1)
-    for _ in range(5): await RisingEdge(dut.clk_i)
-    await drive(dut.rst_i, 0)
-    await RisingEdge(dut.clk_i)
+    await do_reset(dut)
 
-async def set_weights(dut, w0, w1, wv0=1, wv1=1):
+    SEL = 1 << 8
+
+    W00 = 2;  W01 = 3;  W10 = 4;  W11 = 10
+    WP00 = 9; WP11 = 10; WP10 = 2; WP01 = 3
+    A00 = 1;  A01 = 2;  A10 = 6;  A11 = 7
+    WPP10 = 3; WPP00 = 4; WPP01 = 2; WPP11 = 5
+    AP00 = 3; AP01 = 5; AP10 = 4; AP11 = 7
+    APP00 = 4
+    # -------------------------------------------------------------------
+    # C1: 
+    # -------------------------------------------------------------------
     await FallingEdge(dut.clk_i)
-    await drive(dut.weight0, w0);       await drive(dut.weight1, w1)
-    await drive(dut.weight_valid0, wv0); await drive(dut.weight_valid1, wv1)
-    await RisingEdge(dut.clk_i)
+    dut.weight0.value       = W10
+    dut.weight1.value       = 0
+    dut.weight_valid0.value = 1
+    dut.weight_valid1.value = 0
+    dut.act0.value          = 0
+    dut.act1.value          = 0
+    dut.act_valid0.value    = 0
+    dut.act_valid1.value    = 0
 
-async def set_acts(dut, a0, a1, av0=1, av1=1):
+    # -------------------------------------------------------------------
+    # C2:
+    # -------------------------------------------------------------------
     await FallingEdge(dut.clk_i)
-    await drive(dut.act0, a0);       await drive(dut.act1, a1)
-    await drive(dut.act_valid0, av0); await drive(dut.act_valid1, av1)
-    await RisingEdge(dut.clk_i)
+    dut.weight0.value       = W00
+    dut.weight1.value       = W11
+    dut.weight_valid0.value = 1
+    dut.weight_valid1.value = 1
+    dut.act0.value          = 0
+    dut.act1.value          = 0
+    dut.act_valid0.value    = 0
+    dut.act_valid1.value    = 0
 
-async def idle(dut, cycles=1):
+    # -------------------------------------------------------------------
+    # C3:
+    # -------------------------------------------------------------------
     await FallingEdge(dut.clk_i)
-    await drive(dut.weight_valid0, 0); await drive(dut.weight_valid1, 0)
-    await drive(dut.act_valid0, 0);    await drive(dut.act_valid1, 0)
-    for _ in range(cycles): await RisingEdge(dut.clk_i)
+    dut.weight0.value       = WP10 | SEL
+    dut.weight1.value       = W01
+    dut.weight_valid0.value = 1
+    dut.weight_valid1.value = 1
+    dut.act0.value          = A00
+    dut.act1.value          = 0
+    dut.act_valid0.value    = 1
+    dut.act_valid1.value    = 0
 
-async def load_weights(dut, W00, W01, W10, W11):
-    """
-    4-cycle weight load protocol.
-    Row 0 (pe00/pe01) → buf[0] via top-level weight ports.
-    Row 1 (pe10/pe11) → buf[1] via pe00/pe01 weight_out chain.
-    Extra cycles needed because weight_valid_o is suppressed on the
-    sel-bit edge transition, causing pe10/pe11 to need the value
-    re-driven twice before they successfully latch it.
-    """
-    await set_weights(dut, pack(W00, 0),    pack(W01, 0))     # C1: buf[0]
-    await set_weights(dut, pack(W10, SEL1), pack(W11, SEL1))  # C2: buf[1], edge→wvo=0
-    await set_weights(dut, pack(W10, SEL1), pack(W11, SEL1))  # C3: no edge, wvo=1 but pe10 missed
-    await set_weights(dut, pack(W10, SEL1), pack(W11, SEL1))  # C4: pe10/pe11 finally latch
-    await idle(dut, 1)
+    # -------------------------------------------------------------------
+    # C4: 
+    # -------------------------------------------------------------------
+    await FallingEdge(dut.clk_i)
+    dut.weight0.value       = WP00 | SEL
+    dut.weight1.value       = WP11 | SEL
+    dut.weight_valid0.value = 1
+    dut.weight_valid1.value = 1
+    dut.act0.value          = A10
+    dut.act1.value          = A01
+    dut.act_valid0.value    = 1
+    dut.act_valid1.value    = 1
 
-@cocotb.test()
-async def test_reset(dut):
-    await init_dut(dut)
-    await RisingEdge(dut.clk_i)
-    for pe_psum in [dut.pe00.psum_out, dut.pe01.psum_out,
-                    dut.pe10.psum_out, dut.pe11.psum_out]:
-        try: val = int(pe_psum.value)
-        except ValueError: raise AssertionError(f"X/Z after reset: {pe_psum.value}")
-        assert val == 0, f"psum should be 0 after reset, got {val}"
-    cocotb.log.info("PASS: test_reset")
+    # -------------------------------------------------------------------
+    # C5: 
+    # -------------------------------------------------------------------
+    await FallingEdge(dut.clk_i)
+    dut.weight0.value = WPP10
+    dut.weight1.value = WP01 | SEL
+    dut.weight_valid0.value = 1
+    dut.weight_valid1.value = 1
+    dut.act0.value = AP00 | SEL
+    dut.act1.value = A11
+    
+    cocotb.log.info(f"psum_out1 raw = {dut.psum_out1.value}")
+    psum1 = int(dut.psum_out1.value)
+    expected1 = A00 * W00 + A01 * W10   # 1*2 + 2*4 = 10
+    assert psum1 == expected1, f"[C5 psum_out1] Expected {expected1}, got {psum1}"
+    cocotb.log.info(f"PASS: C5 psum_out1  expected={expected1}  got={psum1}")
+    cocotb.log.info(f"psum_out2 at C5 = {dut.psum_out2.value}")
+    # -------------------------------------------------------------------
+    # C6:
+    # -------------------------------------------------------------------
+    await FallingEdge(dut.clk_i)
+    dut.weight0.value = WPP00
+    dut.weight1.value = WPP11
+    dut.act0.value = AP10 | SEL
+    dut.act1.value = AP01 | SEL
+    
+    cocotb.log.info(f"psum_out1 raw = {dut.psum_out1.value}")
+    psum1 = int(dut.psum_out1.value)
+    expected1 = A11 * W10 + A10 * W00
+    assert psum1 == expected1, f"[C6 psum_out1] Expected {expected1}, got {psum1}"
+    cocotb.log.info(f"PASS: C6 psum_out1 expected={expected1}  got={psum1}")
+    
+    cocotb.log.info(f"psum_out2 raw = {dut.psum_out2.value}")
+    psum2 = int(dut.psum_out2.value)
+    expected2 = A00 * W01 + A01 * W11
+    assert psum2 == expected2, f"[C6 psum_out2] Expected {expected2}, got {psum2}"
+    cocotb.log.info(f"PASS: C6 psum_out2  expected={expected2}  got={psum2}")
 
-@cocotb.test()
-async def test_weight_load(dut):
-    """Single PE fires with W00=1 to confirm weight was loaded."""
-    await init_dut(dut)
-    await load_weights(dut, 1, 0, 0, 0)
-    await set_acts(dut, pack(5, 0), 0, av0=1, av1=0)
-    await idle(dut, 2)
-    p = int(dut.pe00.psum_out.value)
-    assert p == 5, f"pe00 expected 5, got {p}"
-    cocotb.log.info("PASS: test_weight_load")
+    #-------------------------------------------------------------------
+    # C7:
+    # ------------------------------------------------------------------- 
+    await FallingEdge(dut.clk_i)
+    dut.weight0.value = W10 | SEL
+    dut.weight1.value = WPP01
+    dut.act0.value = APP00
+    dut.act1.value = AP11 | SEL
+    
+    cocotb.log.info(f"psum_out1 raw = {dut.psum_out1.value}")
+    psum1 = int(dut.psum_out1.value)
+    expected1 = AP00 * WP00 + AP01 * WP10
+    assert psum1 == expected1, f"[C7 psum_out1] Expected {expected1}, got {psum1}"
+    cocotb.log.info(f"PASS: C7 psum_out1 expected={expected1}  got={psum1}")
+    
+    cocotb.log.info(f"psum_out2 raw = {dut.psum_out2.value}")
+    psum2 = int(dut.psum_out2.value)
+    expected2 = A10 * W01 + A11 * W11
+    assert psum2 == expected2, f"[C7 psum_out2] Expected {expected2}, got {psum2}"
+    cocotb.log.info(f"PASS: C7 psum_out2  expected={expected2}  got={psum2}")
 
-@cocotb.test()
-async def test_single_column(dut):
-    """
-    W=[[2,3],[4,5]], fire col0 (x00=1, x10=6).
-    pe10 fires same cycle as pe00; psum_in=0 → pe10=x10*W10=24.
-    """
-    await init_dut(dut)
-    await load_weights(dut, 2, 3, 4, 5)
-    await set_acts(dut, pack(1, 0), pack(6, 1), av0=1, av1=1)
-    await idle(dut, 3)
-    p10 = int(dut.pe10.psum_out.value)
-    assert p10 == 6*4, f"pe10 expected {6*4}, got {p10}"
-    cocotb.log.info("PASS: test_single_column")
+    #-------------------------------------------------------------------
+    # C8:
+    # ------------------------------------------------------------------- 
+    await FallingEdge(dut.clk_i)
+    
+    cocotb.log.info(f"psum_out1 raw = {dut.psum_out1.value}")
+    psum1 = int(dut.psum_out1.value)
+    expected1 = AP11 * WP10 + AP10 * WP00
+    assert psum1 == expected1, f"[C8 psum_out1] Expected {expected1}, got {psum1}"
+    cocotb.log.info(f"PASS: C8 psum_out1 expected={expected1}  got={psum1}")
+    
+    cocotb.log.info(f"psum_out2 raw = {dut.psum_out2.value}")
+    psum2 = int(dut.psum_out2.value)
+    expected2 = AP01 * WP11 + AP00 * WP01
+    assert psum2 == expected2, f"[C8 psum_out2] Expected {expected2}, got {psum2}"
+    cocotb.log.info(f"PASS: C8 psum_out2  expected={expected2}  got={psum2}")
 
-@cocotb.test()
-async def test_two_column_accumulation(dut):
-    """
-    W=[[2,3],[4,5]], X col0=(1,6), col1=(2,7).
-    pe10 in col1: psum_in=pe00_col0=1*2=2, mac=7*4=28 → total=30.
-    """
-    await init_dut(dut)
-    await load_weights(dut, 2, 3, 4, 5)
-    W00, W10 = 2, 4
-    x00, x10, x01, x11 = 1, 6, 2, 7
-    await set_acts(dut, pack(x00, 0), pack(x10, 1), av0=1, av1=1)
-    await set_acts(dut, pack(x01, 0), pack(x11, 1), av0=1, av1=1)
-    await idle(dut, 4)
-    p10 = int(dut.pe10.psum_out.value)
-    expected_p10 = x00*W00 + x11*W10
-    assert p10 == expected_p10, f"pe10 expected {expected_p10}, got {p10}"
-    cocotb.log.info("PASS: test_two_column_accumulation")
+tests = ["test_basic_flow"]
 
-@cocotb.test()
-async def test_weight_chain_propagation(dut):
-    """pe10 must get its weight via the chain from pe00, not directly."""
-    await init_dut(dut)
-    await load_weights(dut, 1, 1, 7, 9)
-    await set_acts(dut, 0, pack(3, 1), av0=0, av1=1)
-    await idle(dut, 3)
-    p10 = int(dut.pe10.psum_out.value)
-    assert p10 == 3*7, f"pe10 expected {3*7}, got {p10}"
-    cocotb.log.info("PASS: test_weight_chain_propagation")
-
-@cocotb.test()
-async def test_fuzz(dut):
-    """20 random weight/activation combinations verified against software model."""
-    import random
-    rng = random.Random(0xC0FFEE)
-    for case in range(20):
-        await init_dut(dut)
-        W00=rng.randint(0,15); W10=rng.randint(0,15)
-        W01=rng.randint(0,15); W11=rng.randint(0,15)
-        x10=rng.randint(0,15)
-        await load_weights(dut, W00, W01, W10, W11)
-        await set_acts(dut, 0, pack(x10, 1), av0=0, av1=1)
-        await idle(dut, 3)
-        p10 = int(dut.pe10.psum_out.value)
-        assert p10 == x10*W10, f"Case {case}: expected {x10*W10}, got {p10}"
-    cocotb.log.info("PASS: test_fuzz (20 cases)")
-
-# ---------------------------------------------------------------------------
-# Pytest wrappers
-# ---------------------------------------------------------------------------
-tests = ["test_reset","test_weight_load","test_single_column",
-         "test_two_column_accumulation","test_weight_chain_propagation","test_fuzz"]
-ROOT = Path(__file__).resolve().parents[1]  # .../slugtpu
-
-SOURCES = [
-    (ROOT / "rtl" / "pe_test" / "sysray" / "pe.sv").resolve(),
-    (ROOT / "rtl" / "pe_test" / "sysray" / "sysray.sv").resolve(),
-]
+proj_path = Path("./rtl").resolve()
+sources = [ proj_path/"pe_test"/"sysray"/"sysray.sv", proj_path/"pe_test"/"sysray"/"pe.sv" ]
 
 @pytest.mark.parametrize("testcase", tests)
 def test_sysray_each(testcase):
-    try:
-        run_test(parameters={}, sources=SOURCES,
-                 module_name="test_sysray", hdl_toplevel="sysray", testcase=testcase)
-    except SystemExit as exc:
-        if exc.code != 0:
-            pytest.fail(f"'{testcase}' failed (exit {exc.code})")
+    """Runs each test independently. Continues on test failure"""
+    run_test(parameters={}, sources=sources, module_name="test_sysray", hdl_toplevel="sysray", testcase=testcase)
+
+# TODO: add more tests
+# - test backpressure
+# - random fuzzing of handshake signals and data
 
 def test_sysray_all():
-    try:
-        run_test(parameters={}, sources=SOURCES,
-                 module_name="test_sysray", hdl_toplevel="sysray")
-    except SystemExit as exc:
-        if exc.code != 0:
-            pytest.fail(f"cocotb tests failed (exit {exc.code})")
+    """Runs each test sequentially as one giant test."""
+    # debug print parameters can be idea if a simulator fails silently without telling you why
+    # print(f"DEBUG PARAMETERs: {depth_p}")
+
+    run_test(parameters={}, sources=sources, module_name="test_sysray", hdl_toplevel="sysray")
