@@ -1,11 +1,15 @@
 {
   "extensionVersion": "1.5.0",
-  "fileName": "/Users/raph/slugtpu/sim_build/icarus/test_add_n/add_n_simple_test/add_n.fst",
-  "markerTime": null,
+  "fileName": "/Users/raph/slugtpu/sim_build/icarus/test_add_n/add_n_random_backpressure/add_n.fst",
+  "markerTime": 100000,
   "altMarkerTime": null,
-  "selectedSignal": null,
-  "zoomRatio": 0.0043910216993249705,
-  "scrollLeft": 0,
+  "selectedSignal": {
+    "name": "add_n.data_ready_i",
+    "msb": -1,
+    "lsb": -1
+  },
+  "zoomRatio": 0.004509305566942691,
+  "scrollLeft": 39586,
   "displayedSignals": [
     {
       "dataType": "signal-group",
