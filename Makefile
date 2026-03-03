@@ -45,6 +45,9 @@ test_scalar_pipe:
 test_scalar_stage:
 	python3 -m pytest sim/test_scalar_stage.py -s
 
+test_load:
+	python3 -m pytest sim/test_load.py -s
+
 clean:
 	rm -rf sim_build
 
