@@ -24,11 +24,18 @@ def pack_weight(valid, sel, data):
     return (valid & 0x1) | ((sel & 0x1) << 1) | ((data & 0xFF) << 2)
 
 async def do_reset(dut):
-    dut.rst_i.value     = 1
-    dut.act0_in.value   = 0
-    dut.act1_in.value   = 0
-    dut.weight_in.value = pack_weight(0, 0, 0)
-    dut.psum_in.value   = 0
+    dut.rst_i.value = 1
+
+    dut.act0_in.value = 0
+    dut.act1_in.value = 0
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 0
+
+    dut.weight_in.value = 0
+    dut.weight_valid.value = 0
+
+    dut.psum_in.value = 0
+
     await RisingEdge(dut.clk_i)
     await RisingEdge(dut.clk_i)
     dut.rst_i.value = 0
@@ -40,53 +47,78 @@ async def tick(dut):
 
 @cocotb.test()
 async def test_basic_flow(dut):
+    """
+    Load two unique weights via shift + latch, then compute.
 
+    W2 = 2 -> PE0 (top) A00= 5
+    W1 = 7 -> PE1 (bottom) A10 = 4
+
+    Expected psum_out = W2*A00 + W1*A10 = 2*5 + 7*4 = 10 + 28 = 38
+    """
     cocotb.start_soon(Clock(dut.clk_i, 10, units="ns").start())
     await do_reset(dut)
 
-    W10  = 1
-    W00  = 2
-    A00  = 3
-    A10  = 4
+    await FallingEdge(dut.clk_i)
+    W1 = 7 # for PE1 (bottom), sent first so it shifts down
+    W2 = 2 # for PE0 (top), sent second, stays at top
+    A00 = 5
+    A10 = 4
 
-    # Cycle B1: W01 arrives at PE0
-    dut.weight_in.value = pack_weight(valid=1, sel=0, data=W10)
-    dut.act0_in.value   = 0
-    dut.act1_in.value   = 0
-    dut.psum_in.value   = 0
+    #Shift phase (buf_sel=0, so shadow = buf[1])
+
+    # sr1: W1 enters PE0's shift register; PE1 sees nothing yet
+    dut.weight_in.value = W1
+    dut.weight_valid.value = 1
+    dut.act0_in.value = 0
+    dut.act1_in.value = 0
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 0
+    dut.psum_in.value = 0
     await FallingEdge(dut.clk_i)
 
-    # Cycle B2: W01 flows down to PE1, W00 arrives at PE0
-    dut.weight_in.value = pack_weight(valid=1, sel=0, data=W00)
+    # sr2: W2 enters PE0, W1 has shifted to PE1. now latch
+    dut.weight_in.value    = W2
+    dut.weight_valid.value = 1
+    await FallingEdge(dut.clk_i)
+    # now PE0.buf[1] = W2, PE1.buf[1] = W1
+
+    # compute phase (flip buf_sel so buf[1] is active)
+
+    dut.weight_valid.value = 0
+
+    # C1
+    dut.act0_in.value = A00
+    dut.act1_in.value = 0
+    dut.act0_valid.value = 1
+    dut.act1_valid.value = 0
+    await FallingEdge(dut.clk_i)
+    # PE0.psum_out = 0 + A00*W2
+
+    # C2
+    dut.act0_in.value = 0
+    dut.act1_in.value = A10
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 1
+    await FallingEdge(dut.clk_i)
+    # PE1.psum_out = (A00*W2) + A10*W1
+
+    # C3: drain. result is registered, read here
+    dut.act0_in.value = 0
+    dut.act1_in.value = 0
+    dut.act0_valid.value = 0
+    dut.act1_valid.value = 0
     await FallingEdge(dut.clk_i)
 
-    # Cycle C1: swap sel=1 so buf[1] is active, act0=A00 into PE0
-    dut.weight_in.value = pack_weight(valid=1, sel=1, data=0)
-    dut.act0_in.value   = A00
-    dut.act1_in.value   = 0
-    await FallingEdge(dut.clk_i)
-
-    # Cycle C2: act1=A10 into PE1, psum_mid from PE0 now available
-    dut.weight_in.value = pack_weight(valid=1, sel=1, data=0)
-    dut.act0_in.value   = 0
-    dut.act1_in.value   = A10
-    await FallingEdge(dut.clk_i)
-    
-    # Cycle C3: psum_out is registered — read here
-    #dut.weight_in.value = pack_weight(valid=0, sel=0, data=0)
-    #dut.act0_in.value   = 0
-    #dut.act1_in.value   = 0
-    #await FallingEdge(dut.clk_i)
-
-    expected = (W00 * A00) + (W10 * A10)
-    assert dut.psum_out.value == expected, \
-        f"Expected {expected}, got {int(dut.psum_out.value)}"
-    cocotb.log.info(f"PASS: basic_flow  psum_out={int(dut.psum_out.value)}")
+    got = int(dut.psum_out.value)
+    expected = W2 * A00 + W1 * A10
+    cocotb.log.info(f"psum_out = {got},  expected = {expected}")
+    assert got == expected, f"FAIL: expected {expected}, got {got}"
+    cocotb.log.info("PASS: test_basic_flow")
 
 tests = ["test_basic_flow"]
 
 proj_path = Path("./rtl").resolve()
-sources = [ proj_path/"pe_test"/"col"/"pe.sv", proj_path/"pe_test"/"col"/"col_pe.sv" ]
+sources = [ proj_path/"pe_test"/"col"/"oldpe.sv", proj_path/"pe_test"/"col"/"col_pe.sv" ]
 
 @pytest.mark.parametrize("testcase", tests)
 def test_bias_each(testcase):

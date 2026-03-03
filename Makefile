@@ -33,6 +33,9 @@ test_write_transaction:
 test_relu_n:
 	python3 -m pytest sim/test_relu_n.py -s
 
+test_pe_col:
+	python3 -m pytest sim/test_pe_col.py -s
+
 clean:
 	rm -rf sim_build
 
