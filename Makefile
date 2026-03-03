@@ -48,6 +48,12 @@ test_scalar_stage:
 test_load:
 	python3 -m pytest sim/test_load.py -s
 
+test_subzp:
+	python3 -m pytest sim/test_subzp.py -s
+
+test_sysray:
+	python3 -m pytest sim/test_sysray.py -s
+
 clean:
 	rm -rf sim_build
 
