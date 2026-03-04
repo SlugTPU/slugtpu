@@ -222,11 +222,12 @@ async def add_n_stream(dut):
     N = dut.N
     total_nin = 10
 
-    def generate_data() -> Iterator[tuple[int, int]]:
+    def generate_data() -> Iterator[tuple[Array[int], Array[int]]]:
         n = 0
         while n < total_nin:
-            # yield [random.randint(-2**(width_p.value.to_unsigned()-1), 2**(width_p.value.to_unsigned()-1)-1) for _ in range(N.value.to_unsigned())]
-            yield [random.randint(-10, 10) for _ in range(N.value.to_unsigned())], [random.randint(-10, 10) for _ in range(N.value.to_unsigned())]
+            # yield random input and bias data from [-10, 10]
+            yield ([random.randint(-10, 10) for _ in range(N.value.to_unsigned())], 
+                   [random.randint(-10, 10) for _ in range(N.value.to_unsigned())])
             n += 1
 
     # emulate man(1)
@@ -264,11 +265,11 @@ async def add_n_random_backpressure(dut):
     N = dut.N
     total_nin = 10
 
-    def generate_data() -> Iterator[tuple[int, int]]:
+    def generate_data() -> Iterator[tuple[Array[int], Array[int]]]:
         n = 0
         while n < total_nin:
-            # yield [random.randint(-2**(width_p.value.to_unsigned()-1), 2**(width_p.value.to_unsigned()-1)-1) for _ in range(N.value.to_unsigned())]
-            yield [random.randint(-10, 10) for _ in range(N.value.to_unsigned())], [random.randint(-10, 10) for _ in range(N.value.to_unsigned())]
+            yield ([random.randint(-10, 10) for _ in range(N.value.to_unsigned())], 
+                   [random.randint(-10, 10) for _ in range(N.value.to_unsigned())])
             n += 1
 
     def generate_backpressure() -> Iterator[bool]:
