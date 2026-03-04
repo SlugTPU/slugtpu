@@ -21,10 +21,14 @@ def run_test(parameters, sources, module_name, hdl_toplevel, testcase=None, sims
     for sim in sims:
         build_dir = Path("./sim_build", sim, module_name, case_name, stringify_dict(parameters))
         build_args = []
+        test_args = []
 
         # extra stuff specifically for verilator
         if (sim == "verilator"):
+            build_args.append("--trace")
+            build_args.append("--trace-structs")
             build_args.append("--trace-fst")
+            test_args = build_args.copy()
 
         runner = get_runner(sim)
         runner.build(
@@ -42,4 +46,7 @@ def run_test(parameters, sources, module_name, hdl_toplevel, testcase=None, sims
         print(f"Running test '{case_name}' with {sim}...")
         print(f"Build command: {runner._build_command()}")
 
-        runner.test(testcase=testcase, hdl_toplevel=hdl_toplevel, test_module=module_name)
+        try:
+            runner.test(testcase=testcase, test_args=test_args, hdl_toplevel=hdl_toplevel, test_module=module_name, waves=True)
+        except:
+            print(f"Test '{case_name}' with {sim} failed")
