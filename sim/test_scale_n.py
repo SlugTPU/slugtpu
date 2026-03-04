@@ -12,6 +12,8 @@ from collections import deque
 import random
 from shared import handshake
 
+# TODO: 
+# - test saturation behavior
 
 def float_to_fixed(f_val, frac_bits):
     """Converts a float to a fixed-point integer."""
