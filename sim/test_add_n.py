@@ -35,7 +35,7 @@ class add_n_model():
         self.q = deque()
 
     def consume(self, dut):
-        cocotb.log.info(f"Debug: got data_i={[dut.data_i[i].value for i in range(self.N)]}, bias_i={[dut.bias_i[i].value for i in range(self.N)]}")
+        cocotb.log.info(f"Debug: got data_i={[dut.data_i[i].value.to_signed() for i in range(self.N)]}, bias_i={[dut.bias_i[i].value.to_signed() for i in range(self.N)]}")
         cocotb.log.info(f"Consuming input: data_i={[dut.data_i[i].value.to_signed() for i in range(self.N)]}, bias_i={[dut.bias_i[i].value.to_signed() for i in range(self.N)]}")
         data_snapshot = [dut.data_i[i].value for i in range(self.N)]
         bias_snapshot = [dut.bias_i[i].value for i in range(self.N)]
@@ -210,6 +210,49 @@ async def add_n_simple_test(dut):
     data_ready_i.value = 1
     data_valid_i.value = 0
     await FallingEdge(dut.clk_i)
+
+# stream input with no backpressure on output
+@cocotb.test()
+async def add_n_stream(dut):
+    """Randomized test with backpressure."""
+
+    width_p = dut.width_p    
+    clk_i = dut.clk_i
+    rst_i = dut.rst_i
+    N = dut.N
+    total_nin = 10
+
+    def generate_data() -> Iterator[tuple[int, int]]:
+        n = 0
+        while n < total_nin:
+            # yield [random.randint(-2**(width_p.value.to_unsigned()-1), 2**(width_p.value.to_unsigned()-1)-1) for _ in range(N.value.to_unsigned())]
+            yield [random.randint(-10, 10) for _ in range(N.value.to_unsigned())], [random.randint(-10, 10) for _ in range(N.value.to_unsigned())]
+            n += 1
+
+    # emulate man(1)
+    def generate_yes() -> Iterator[bool]:
+        while True:
+            yield True
+
+    def generate_backpressure() -> Iterator[bool]:
+        while True:
+            yield random.choice([True, False])
+
+    m = ModelRunner(dut)
+    im = InputModel(dut, generate_data(), generate_backpressure(), N.value.to_unsigned(), width_p.value.to_unsigned())
+    om = OutputModel(dut, generate_yes(), total_nin=total_nin, N=N.value.to_unsigned(), width=width_p.value.to_unsigned())
+
+    await clock_start(clk_i)
+    await reset_sequence(clk_i, rst_i)
+
+    m.start()
+    task_im = im.start()
+    task_om = om.start()
+
+    await task_om.complete
+    await FallingEdge(clk_i)
+    dut.data_ready_i.value = 0
+    dut.data_valid_i.value = 0
 
 @cocotb.test()
 async def add_n_random_backpressure(dut):
