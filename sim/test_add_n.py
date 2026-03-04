@@ -53,10 +53,10 @@ class add_n_model():
             assert data_o[i].value == res, f"Expected {res.to_signed()}, got {data_o[i].value.to_signed()} at index {i}"
 
 class InputModel():
-    def __init__(self, dut, data_generator: Iterator[tuple[Array[int], Array[int]]], handshake_generator: Iterator[bool], N, width):
+    def __init__(self, dut, data_generator: Iterator[tuple[Array[int], Array[int]]], handshake_generator: Iterator[bool]):
         self.dut = dut
-        self.N = N
-        self.width = width
+        self.N = dut.N.value.to_unsigned()
+        self.width = dut.width_p.value.to_unsigned()
         self.data_generator = data_generator
         self.handshake_generator = handshake_generator
         self.nin = 0
@@ -95,10 +95,10 @@ class InputModel():
             await FallingEdge(clk_i)
 
 class OutputModel():
-    def __init__(self, dut, handshake_generator, total_nin, N, width ):
+    def __init__(self, dut, handshake_generator, total_nin):
         self.dut = dut
-        self.N = N
-        self.width = width
+        self.N = dut.N.value.to_unsigned()
+        self.width = dut.width_p.value.to_unsigned()
         self.total_nin = total_nin
         self.nout = 0
         self.handshake_generator = handshake_generator
@@ -240,8 +240,8 @@ async def add_n_stream(dut):
             yield random.choice([True, False])
 
     m = ModelRunner(dut)
-    im = InputModel(dut, generate_data(), generate_backpressure(), N.value.to_unsigned(), width_p.value.to_unsigned())
-    om = OutputModel(dut, generate_yes(), total_nin=total_nin, N=N.value.to_unsigned(), width=width_p.value.to_unsigned())
+    im = InputModel(dut, generate_data(), generate_backpressure())
+    om = OutputModel(dut, generate_yes(), total_nin=total_nin)
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
@@ -277,8 +277,8 @@ async def add_n_random_backpressure(dut):
             yield random.choice([True, False])
 
     m = ModelRunner(dut)
-    im = InputModel(dut, generate_data(), generate_backpressure(), N.value.to_unsigned(), width_p.value.to_unsigned())
-    om = OutputModel(dut, generate_backpressure(), total_nin=total_nin, N=N.value.to_unsigned(), width=width_p.value.to_unsigned())
+    im = InputModel(dut, generate_data(), generate_backpressure())
+    om = OutputModel(dut, generate_backpressure(), total_nin=total_nin)
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
