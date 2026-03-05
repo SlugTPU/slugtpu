@@ -29,18 +29,20 @@ module sram_mux #(
 );
 
     logic rw_mode;
+    logic in_use;
     logic [num_readers-1:0] which_reader;
     logic [num_writers-1:0] which_writer;
 
     assign rd_valid_o = which_reader;
-    assign rd_ready_i = which_writer;
+    assign wr_ready_o = which_writer;
 
     always_ff @( posedge clk_i ) begin
         if(rst_i) begin
             which_reader <= '1;
             which_writer <= '1;
             rw_mode <= '0;
-        end
+            in_use <= '0;
+        end else if(~in_use & which_reader )
     end
 
     

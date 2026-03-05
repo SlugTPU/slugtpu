@@ -1,63 +1,103 @@
-module systolic_array #(
-    parameter N          = 4,
-    parameter DATA_WIDTH = 8,
-    parameter ACC_WIDTH  = 32
+module sysray #(
+  parameter DATA_WIDTH = 8,
+  parameter ACC_WIDTH  = 32
 )(
-    input  logic                                    clk_i,
-    input  logic                                    rst_i,
+  input logic clk_i,
+  input logic rst_i,
 
-    input  logic [N-1:0][DATA_WIDTH-1:0]            act_in,
-    input  logic [N-1:0][DATA_WIDTH-1:0]            weight_in,
-    input  logic [N-1:0]                            weight_we,
-    input  logic [N-1:0]                            buf_sel_in,
+  input logic [DATA_WIDTH:0] act0,
+  input logic [DATA_WIDTH:0] act1,
 
-    output logic [N-1:0][ACC_WIDTH-1:0]             psum_out
+  input logic [DATA_WIDTH:0] weight0,
+  input logic [DATA_WIDTH:0] weight1,
+
+  input logic weight_valid0,
+  input logic weight_valid1,
+
+  input logic act_valid0,
+  input logic act_valid1,
+
+  output logic [ACC_WIDTH-1:0] psum_out1,
+  output logic [ACC_WIDTH-1:0] psum_out2
 );
 
-    logic [N:0][N-1:0][DATA_WIDTH-1:0] act_chain;
-    logic [N:0][N-1:0][DATA_WIDTH-1:0] weight_chain;
-    logic [N:0][N-1:0]                 buf_sel_chain;
-    logic [N:0][N-1:0]                 weight_we_chain;
-    logic [N:0][N-1:0][ACC_WIDTH-1:0]  psum_chain;
+  logic [DATA_WIDTH:0]  act00_out;
+  logic [DATA_WIDTH:0]  weight00_out;
+  logic                 weight_valid00_out;
+  logic                 act_valid00_out;
+  logic [ACC_WIDTH-1:0] psum_00_out;              
 
-    always_comb begin
-        for (int col = 0; col < N; col++) begin
-            act_chain[0][col]       = act_in[col];
-            weight_chain[0][col]    = weight_in[col];
-            weight_we_chain[0][col] = weight_we[col];
-            buf_sel_chain[0][col]   = buf_sel_in[col];
-            psum_chain[0][col]      = '0;
-        end
-    end
+  pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe00 (
+    .clk_i(clk_i),
+    .rst_i(rst_i),
+    .act_in(act0),
+    .act_out(act00_out),
+    .weight_in(weight0),
+    .weight_out(weight00_out),
+    .weight_valid(weight_valid0),
+    .weight_valid_o(weight_valid00_out),
+    .act_valid(act_valid0),
+    .act_valid_o(act_valid00_out),
+    .psum_in({ACC_WIDTH{1'b0}}),
+    .psum_out(psum_00_out)
+  );
 
-    genvar row, col;
-    generate
-        for (row = 0; row < N; row++) begin : gen_row
-            for (col = 0; col < N; col++) begin : gen_col
-                pe #(
-                    .DATA_WIDTH(DATA_WIDTH),
-                    .ACC_WIDTH(ACC_WIDTH)
-                ) pe_inst (
-                    .clk_i        (clk_i),
-                    .rst_i        (rst_i),
-                    .act_in       (act_chain[row][col]),
-                    .act_out      (act_chain[row][col+1]),
-                    .weight_in    (weight_chain[row][col]),
-                    .weight_out   (weight_chain[row+1][col]),
-                    .buf_sel_in   (buf_sel_chain[row][col]),
-                    .buf_sel_out  (buf_sel_chain[row+1][col]),
-                    .weight_we    (weight_we_chain[row][col]),
-                    .weight_we_out(weight_we_chain[row+1][col]),
-                    .psum_in      (psum_chain[row][col]),
-                    .psum_out     (psum_chain[row+1][col])
-                );
-            end
-        end
-    endgenerate
+  logic [DATA_WIDTH:0]  weight01_out;
+  logic                 weight_valid01_out;
+  logic [ACC_WIDTH-1:0] psum_01_out;
 
-    always_comb begin
-        for (int col = 0; col < N; col++)
-            psum_out[col] = psum_chain[N][col];
-    end
+  pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe01 (
+    .clk_i(clk_i),
+    .rst_i(rst_i),
+    .act_in(act00_out),
+    .act_out(),
+    .weight_in(weight1),
+    .weight_out(weight01_out),
+    .weight_valid(weight_valid1),
+    .weight_valid_o(weight_valid01_out),
+    .act_valid(act_valid00_out),
+    .act_valid_o(),
+    .psum_in({ACC_WIDTH{1'b0}}),
+    .psum_out(psum_01_out)
+  );
+
+  logic [DATA_WIDTH:0]  act_10_out;
+  logic                 act_valid10_out;
+  logic [ACC_WIDTH-1:0] psum_10_out;
+
+  pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe10 (
+    .clk_i(clk_i),
+    .rst_i(rst_i),
+    .act_in(act1),
+    .act_out(act_10_out),
+    .weight_in(weight00_out),
+    .weight_out(),
+    .weight_valid(weight_valid00_out),
+    .weight_valid_o(),
+    .act_valid(act_valid1),
+    .act_valid_o(act_valid10_out),
+    .psum_in(psum_00_out),
+    .psum_out(psum_10_out)
+  );
+
+  logic [ACC_WIDTH-1:0] psum_11_out;
+
+  pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe11 (
+    .clk_i(clk_i),
+    .rst_i(rst_i),
+    .act_in(act_10_out),
+    .act_out(),
+    .weight_in(weight01_out),
+    .weight_out(),
+    .weight_valid(weight_valid01_out),
+    .weight_valid_o(),
+    .act_valid(act_valid10_out),
+    .act_valid_o(),
+    .psum_in(psum_01_out),
+    .psum_out(psum_11_out)
+  );
+
+  assign psum_out1 = psum_10_out;
+  assign psum_out2 = psum_11_out;
 
 endmodule

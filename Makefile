@@ -33,6 +33,9 @@ test_quantizer_mul:
 test_write_transaction:
 	python3 -m pytest sim/test_write_transaction.py -s
 
+test_read_transaction:
+	python3 -m pytest sim/test_read_transaction.py -s
+
 test_relu_n:
 	python3 -m pytest sim/test_relu_n.py -s
 
@@ -44,6 +47,15 @@ test_scalar_pipe:
 
 test_scalar_stage:
 	python3 -m pytest sim/test_scalar_stage.py -s
+
+test_load:
+	python3 -m pytest sim/test_load.py -s
+
+test_subzp:
+	python3 -m pytest sim/test_subzp.py -s
+
+test_sysray:
+	python3 -m pytest sim/test_sysray.py -s
 
 clean:
 	rm -rf sim_build

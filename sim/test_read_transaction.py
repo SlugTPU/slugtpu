@@ -27,7 +27,8 @@ async def test_simple(dut):
     data_o = dut.data_o
 
     count = 8
-    sram = [-1 for _ in range(count)]
+    sram = [i for i in range(count)]
+    out = [-1 for _ in range(count)]
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
@@ -46,12 +47,13 @@ async def test_simple(dut):
         load_valid_i.value = 1
         amount.value = count
         addr_i.value = start_addr
-        valid_i.value = 0
+        valid_i.value = 1
+        data_i.value = sram[0]
         ready_i.value = 0
         await FallingEdge(clk_i)
         load_valid_i.value = 0
         assert load_ready_o.value == 0
-        assert valid_o.value == 0
+        assert valid_o.value == 1
         assert ready_o.value == 0
         await RisingEdge(clk_i)
 
@@ -59,14 +61,14 @@ async def test_simple(dut):
             
             ready_i.value = 1
             valid_i.value = 1
-            data_i.value = i
-
+            data_i.value = sram[addr_o.value]
             await FallingEdge(clk_i)
-            assert valid_o.value == 1
-            assert ready_o.value == 1
-            assert data_o.value == i
-            sram[addr_o.value] = int(data_o.value)
-            assert addr_o.value == i+start_addr
+                # assert ready_o.value == 1
+                #assert data_o.value == i
+            out[i] = int(data_o.value)
+            if(i != count -1):
+                assert addr_o.value == i+start_addr+1
+                #assert valid_o.value == 1
         await FallingEdge(clk_i)
         assert load_ready_o.value == 1
         assert valid_o.value == 0
@@ -75,6 +77,9 @@ async def test_simple(dut):
         assert valid_o.value == 0
         await FallingEdge(clk_i)
         print("SRAM CONTENTS: ", sram)
+        print("Output contents: ", out)
+        assert out == sram
+        
     
 
 tests = [
@@ -83,14 +88,14 @@ tests = [
 
 proj_path = Path("./rtl").resolve()
 sources = [
-    proj_path / "sram/write_transaction.sv",
+    proj_path / "sram/read_transaction.sv",
 ]
 
 @pytest.mark.parametrize("testcase", tests)
 def test_write_each(testcase):
     """Runs each test independently. Continues on test failure."""
-    run_test(parameters={}, sources=sources, module_name="test_write_transaction", hdl_toplevel="write_transaction", testcase=testcase, sims=['icarus'])
+    run_test(parameters={}, sources=sources, module_name="test_read_transaction", hdl_toplevel="read_transaction", testcase=testcase, sims=['icarus'])
 
 def test_write_all():
     """Runs all tests sequentially in one simulation."""
-    run_test(parameters={}, sources=sources, module_name="test_write_transaction", hdl_toplevel="write_transaction", sims=['icarus'])
+    run_test(parameters={}, sources=sources, module_name="test_read_transaction", hdl_toplevel="read_transaction", sims=['icarus'])

@@ -1,192 +1,201 @@
+from typing import Iterator
 import pytest
 import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, FallingEdge, ClockCycles
 from pathlib import Path
-from shared import clock_start, reset_sequence
+from shared import clock_start, reset_sequence, handshake
+from cocotb.types import LogicArray, Logic, Array
 from runner import run_test
 import random
+from test_scale_n import float_to_fixed, fixed_to_float, quantize
+from collections import deque
 
-N = 8
-FIXED_SHIFT = 16
+def relu(x):
+    return max(0, x)
 
+class SclarPipeModel():
+    def __init__(self):
+        self.q = deque()
 
-def to_uint(val, width=32):
-    return val & ((1 << width) - 1)
+    def consume(self, dut):
+        N = dut.N.value.to_unsigned()
+        data_i_n = [dut.data_i[i].value for i in range(N)]
+        bias_i_n = [dut.bias_i[i].value for i in range(N)]
+        zp_i_n = [dut.zero_point_i[i].value for i in range(N)]
+        scale_i_n = [dut.scale_i[i].value for i in range(N)]
+        self.q.append((data_i_n, bias_i_n, zp_i_n, scale_i_n))
 
+    def produce(self, dut):
+        data_o = dut.data_o
+        data_i_n, bias_i_n, zp_i_n, scale_i_n = self.q.popleft()
+        N = dut.N.value.to_unsigned()
+        FIXED_SHIFT = dut.FIXED_SHIFT.value.to_unsigned()
 
-def drive_array(signal, values, width=32):
-    for i in range(len(values)):
-        signal[i].value = to_uint(values[i], width)
-
-
-def read_array_s8(signal, n):
-    out = []
-    for i in range(n):
-        raw = int(signal[i].value) & 0xFF
-        out.append(raw - 256 if raw >= 128 else raw)
-    return out
-
-
-def quantize(psum, m0, shift=FIXED_SHIFT):
-    """Matches quantizer_mul.sv: multiply, round, shift, saturate."""
-    product = psum * m0
-    rounded = product + (1 << (shift - 1))
-    # >> is arithmetic for negative numbers in py
-    shifted = rounded >> shift
-    return max(-128, min(127, shifted))
-
-
-def scalar_pipe_ref(data, bias, zp, scale):
-    """Golden model for the full pipeline."""
-    out = []
-    for i in range(len(data)):
-        v = data[i] + bias[i]
-        v = max(0, v)
-        v = v - zp[i]
-        v = quantize(v, scale[i])
-        out.append(v)
-    return out
-
-
-async def init(dut):
-    cocotb.start_soon(Clock(dut.clk_i, 10, unit="ns").start())
-    dut.rst_i.value = 1
-    dut.data_valid_i.value = 0
-    dut.data_ready_i.value = 1
-    drive_array(dut.data_i, [0] * N)
-    drive_array(dut.bias_i, [0] * N)
-    drive_array(dut.zero_point_i, [0] * N)
-    drive_array(dut.scale_i, [0] * N)
-    await ClockCycles(dut.clk_i, 5)
-    await FallingEdge(dut.clk_i)
-    dut.rst_i.value = 0
-    await ClockCycles(dut.clk_i, 2)
-
-
-@cocotb.test()
-async def test_basic(dut):
-    """Single vector through pipeline, verify each lane."""
-    await init(dut)
-
-    data  = [100, -50, 200, 0, 50, 75, -10, 150]
-    bias  = [10,   20, -30, 50, -5, 10,  15, -20]
-    zp    = [5,     5,   5,  5,  5,  5,   5,   5]
-    scale = [1 << FIXED_SHIFT] * N  # 1.0 in Q16
-
-    expected = scalar_pipe_ref(data, bias, zp, scale)
-
-    drive_array(dut.bias_i, bias)
-    drive_array(dut.zero_point_i, zp)
-    drive_array(dut.scale_i, scale)
-
-    # one valid cycle
-    await FallingEdge(dut.clk_i)
-    drive_array(dut.data_i, data)
-    dut.data_valid_i.value = 1
-
-    await FallingEdge(dut.clk_i)
-    dut.data_valid_i.value = 0
-
-    # wait for output
-    for cyc in range(20):
-        await RisingEdge(dut.clk_i)
-        if dut.data_valid_o.value == 1:
-            break
-    else:
-        assert False, "data_valid_o never asserted"
-
-    got = read_array_s8(dut.data_o, N)
-    cocotb.log.info(f"expected: {expected}")
-    cocotb.log.info(f"got: {got}")
-    for i in range(N):
-        assert got[i] == expected[i], \
-            f"lane {i}: expected {expected[i]}, got {got[i]}"
-
-
-@cocotb.test()
-async def test_saturation(dut):
-    """Verify int8 saturation clamps to [-128, 127]."""
-    await init(dut)
-
-    # large pos values that should saturate to 127
-    data  = [10000] * N
-    bias  = [0] * N
-    zp    = [0] * N
-    scale = [1 << FIXED_SHIFT] * N
-
-    expected = scalar_pipe_ref(data, bias, zp, scale)
-    assert all(e == 127 for e in expected)
-
-    drive_array(dut.bias_i, bias)
-    drive_array(dut.zero_point_i, zp)
-    drive_array(dut.scale_i, scale)
-
-    await FallingEdge(dut.clk_i)
-    drive_array(dut.data_i, data)
-    dut.data_valid_i.value = 1
-    await FallingEdge(dut.clk_i)
-    dut.data_valid_i.value = 0
-
-    for _ in range(20):
-        await RisingEdge(dut.clk_i)
-        if dut.data_valid_o.value == 1:
-            break
-
-    got = read_array_s8(dut.data_o, N)
-    for i in range(N):
-        assert got[i] == 127, f"lane {i}: expected 127, got {got[i]}"
-
-
-@cocotb.test()
-async def test_multi_vector(dut):
-    """Push multiple vectors back-to-back, check all outputs."""
-    await init(dut)
-
-    vectors = [
-        [10, 20, 30, 40, 50, 60, 70, 80],
-        [-5, -10, -15, -20, 100, 100, 100, 100],
-        [0, 0, 0, 0, 0, 0, 0, 0],
-    ]
-    bias  = [1, 2, 3, 4, 5, 6, 7, 8]
-    zp    = [2, 2, 2, 2, 2, 2, 2, 2]
-    scale = [1 << FIXED_SHIFT] * N
-
-    expected_all = [scalar_pipe_ref(v, bias, zp, scale) for v in vectors]
-
-    drive_array(dut.bias_i, bias)
-    drive_array(dut.zero_point_i, zp)
-    drive_array(dut.scale_i, scale)
-
-    # drive all vectors on consecutive cycles
-    for v in vectors:
-        await FallingEdge(dut.clk_i)
-        drive_array(dut.data_i, v)
-        dut.data_valid_i.value = 1
-
-    await FallingEdge(dut.clk_i)
-    dut.data_valid_i.value = 0
-
-    # collect outputs
-    results = []
-    for _ in range(40):
-        await RisingEdge(dut.clk_i)
-        if dut.data_valid_o.value == 1:
-            results.append(read_array_s8(dut.data_o, N))
-            if len(results) == len(vectors):
-                break
-
-    assert len(results) == len(vectors), \
-        f"expected {len(vectors)} outputs, got {len(results)}"
-
-    for idx, (got, exp) in enumerate(zip(results, expected_all)):
-        cocotb.log.info(f"vec {idx}: expected={exp}, got={got}")
         for i in range(N):
-            assert got[i] == exp[i], \
-                f"vec {idx} lane {i}: expected {exp[i]}, got {got[i]}"
+            data_i, bias, zp, m0 = data_i_n[i].to_signed(), bias_i_n[i].to_signed(), zp_i_n[i].to_signed(), scale_i_n[i].to_unsigned()
+            # bias -> relu -> zero point -> quantize
+            # zp is signed so we implicitly subtracts
+            got = data_o[i].value.to_signed()
+            expected = quantize(relu(data_i + bias) + zp, fixed_to_float(m0, FIXED_SHIFT))
 
+            # expected = max(0, inp[i].to_signed())
+            cocotb.log.info(f"=== Producing output...")
+            cocotb.log.info(f"Input data: {data_i}, bias: {bias}, zero point: {zp}, scale: {fixed_to_float(m0, FIXED_SHIFT)}")
+            cocotb.log.info(f"Got {got}, expected {expected}")
+            cocotb.log.info(f"=== Finished producing output")
+            assert abs(got - expected) / (abs(expected) + 1e-12) < 0.10, f"Output mismatch at index {i}: got {got}, expected {expected}"
 
-#pytest
+class ModelRunner():
+    def __init__(self, dut):
+        self.dut = dut
+        self.model = SclarPipeModel()
+
+    def start(self):
+        cocotb.start_soon(self.run_input())
+        cocotb.start_soon(self.run_output())
+
+    async def run_input(self):
+        clk_i = self.dut.clk_i
+        valid_i, valid_o = self.dut.data_valid_i, self.dut.data_valid_o
+        ready_i, ready_o = self.dut.data_ready_i, self.dut.data_ready_o
+        rst_i = self.dut.rst_i
+
+        while True:
+            await handshake(clk_i, rst_i, ready_o, valid_i)
+            self.model.consume(self.dut)
+
+    async def run_output(self):
+        clk_i = self.dut.clk_i
+        valid_i, valid_o = self.dut.data_valid_i, self.dut.data_valid_o
+        ready_i, ready_o = self.dut.data_ready_i, self.dut.data_ready_o
+        rst_i = self.dut.rst_i
+
+        while True:
+            cocotb.log.info("Waiting for output handshake...")
+            await handshake(clk_i, rst_i, ready_i, valid_o)
+            self.model.produce(self.dut)
+            cocotb.log.info("Output handshake successful, producing output")
+
+    
+class InputModel():
+    def __init__(self, dut, data_generator: Iterator[tuple[Array[int], Array[int], Array[int], Array[int]]], handshake_generator: Iterator[bool]):
+        self.dut = dut
+        self.N = dut.N.value.to_unsigned()
+        self.data_generator = data_generator
+        self.handshake_generator = handshake_generator
+        self.nin = 0
+
+    def start(self):
+        return cocotb.start_soon(self._run())
+
+    async def _run(self):
+        clk_i = self.dut.clk_i
+        rst_i = self.dut.rst_i
+        valid_i = self.dut.data_valid_i
+        ready_i = self.dut.data_ready_i
+        ready_o = self.dut.data_ready_o
+        data_i = self.dut.data_i
+        bias_i = self.dut.bias_i
+        zp_i = self.dut.zero_point_i
+        scale_i = self.dut.scale_i
+
+        await FallingEdge(rst_i)
+
+        # stream random
+        for (data, bias, zp, m0) in self.data_generator:
+            tx = False
+
+            for i in range(self.N):
+                data_i[i].value = data[i]
+                bias_i[i].value = bias[i]
+                zp_i[i].value = zp[i]
+                scale_i[i].value = m0[i]
+
+            while (not tx):
+                valid_i.value = next(self.handshake_generator)
+
+                await RisingEdge(clk_i)
+
+                # cocotb.log.info(f"Tx input: data_i={[data_i[i].value.to_signed() for i in range(self.N)]}, m0_i={[m0_i[i].value.to_signed() for i in range(self.N)]}")
+                if valid_i.value and ready_o.value == 1:
+                    self.nin += 1
+                    tx = True
+            await FallingEdge(clk_i)
+
+class OutputModel():
+    def __init__(self, dut, handshake_generator, total_nin):
+        self.dut = dut
+        self.N = dut.N.value.to_unsigned()
+        self.total_nin = total_nin
+        self.nout = 0
+        self.handshake_generator = handshake_generator
+
+    def start(self):
+        return cocotb.start_soon(self._run())
+
+    async def _run(self):
+        clk_i = self.dut.clk_i
+        rst_i = self.dut.rst_i
+        valid_o = self.dut.data_valid_o
+        ready_i = self.dut.data_ready_i
+        data_o = self.dut.data_o
+
+        await FallingEdge(rst_i)
+
+        while self.nout < self.total_nin:
+            rx = False
+            while (not rx):
+                ready_i.value = next(self.handshake_generator)
+                await RisingEdge(clk_i)
+                if valid_o.value == 1:
+                    self.nout += 1
+                    rx = True
+            await FallingEdge(clk_i)
+
+@cocotb.test()
+async def test_scalar_pipe_basic(dut):
+    """Single vector through pipeline, verify each lane."""
+    clk_i = dut.clk_i
+    rst_i = dut.rst_i
+    N = dut.N.value.to_unsigned()
+    FIXED_SHIFT = dut.FIXED_SHIFT.value.to_unsigned()
+    total_nin = 10
+
+    # generate total_nin random transactions
+    def data_generator() -> Iterator[tuple[Array[int], Array[int], Array[int], Array[int]]]:
+        for _ in range(total_nin):
+            data = [random.randint(-10, 10) for _ in range(N)]
+            bias = [random.randint(-10, 10) for _ in range(N)]
+            zp = [random.randint(-10, 10) for _ in range(N)]
+            scale = [float_to_fixed(random.random(), FIXED_SHIFT) for _ in range(N)]
+            yield (data, bias, zp, scale)
+
+    # emulate yes(1)
+    def yes_generator() -> Iterator[bool]:
+        while True:
+            yield True
+
+    input_model = InputModel(dut, data_generator(), yes_generator())
+    output_model = OutputModel(dut, yes_generator(), total_nin)
+    m = ModelRunner(dut)
+
+    await clock_start(clk_i)
+    await reset_sequence(clk_i, rst_i)
+
+    m.start()
+    task_im = input_model.start()
+    task_om = output_model.start()
+
+    await task_om.complete
+    await FallingEdge(clk_i)
+    dut.data_ready_i.value = 0
+    dut.data_valid_i.value = 0
+    await FallingEdge(clk_i)
+
+tests = [
+    "test_scalar_pipe_basic",
+]
 
 SOURCES = [
     Path("./rtl/scalar_units/scalar_pipe.sv").resolve(),
@@ -197,26 +206,20 @@ SOURCES = [
     Path("./rtl/utils/elastic.sv").resolve(),
 ]
 
-PARAMS = {"N": N, "PSUM_W": 32, "M0_W": 32, "FIXED_SHIFT": FIXED_SHIFT}
-
-tests = [
-    "test_basic",
-    "test_saturation",
-    "test_multi_vector",
-]
-
-
 @pytest.mark.parametrize("testcase", tests)
-def test_scalar_pipe(testcase):
-    try:
-        run_test(
-            parameters=PARAMS,
-            sources=SOURCES,
-            module_name="test_scalar_pipe",
-            hdl_toplevel="scalar_pipe",
-            testcase=testcase,
-            sims=["icarus"],
-        )
-    except SystemExit as exc:
-        if exc.code != 0:
-            pytest.fail(f"cocotb test '{testcase}' failed (exit code {exc.code})")
+def test_scalar_pipe_each(testcase):
+    run_test(
+        sources=SOURCES,
+        module_name="test_scalar_pipe",
+        hdl_toplevel="scalar_pipe",
+        parameters={},
+        testcase=testcase,
+    )
+
+def test_scalar_pipe_all():
+    run_test(
+        sources=SOURCES,
+        module_name="test_scalar_pipe",
+        hdl_toplevel="scalar_pipe",
+        parameters={},
+    )

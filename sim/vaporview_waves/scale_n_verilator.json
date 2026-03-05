@@ -1,11 +1,15 @@
 {
   "extensionVersion": "1.5.0",
   "fileName": "/Users/raph/slugtpu/sim_build/verilator/test_scale_n/all/dump.fst",
-  "markerTime": null,
+  "markerTime": 339572,
   "altMarkerTime": null,
-  "selectedSignal": null,
-  "zoomRatio": 0.01875752623327482,
-  "scrollLeft": 195495,
+  "selectedSignal": {
+    "name": "scale_n.data_o.[2]",
+    "msb": 7,
+    "lsb": 0
+  },
+  "zoomRatio": 0.03262230941813209,
+  "scrollLeft": 335501,
   "displayedSignals": [
     {
       "dataType": "signal-group",
