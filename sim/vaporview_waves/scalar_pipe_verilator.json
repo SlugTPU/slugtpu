@@ -1,11 +1,15 @@
 {
   "extensionVersion": "1.5.0",
   "fileName": "/Users/raph/slugtpu/sim_build/verilator/test_scalar_pipe/test_scalar_pipe_basic/dump.fst",
-  "markerTime": 22704,
+  "markerTime": 120662,
   "altMarkerTime": null,
-  "selectedSignal": null,
-  "zoomRatio": 0.007311397110649184,
-  "scrollLeft": 59906,
+  "selectedSignal": {
+    "name": "scalar_pipe.u_sub_zp.data_i",
+    "msb": 0,
+    "lsb": 0
+  },
+  "zoomRatio": 0.007982817268401289,
+  "scrollLeft": 85058,
   "displayedSignals": [
     {
       "dataType": "signal-group",
@@ -440,7 +444,7 @@
         {
           "dataType": "signal-group",
           "groupName": "M0",
-          "collapseState": 1,
+          "collapseState": 2,
           "children": [
             {
               "dataType": "netlist-variable",
@@ -558,7 +562,7 @@
         {
           "dataType": "signal-group",
           "groupName": "data_o",
-          "collapseState": 1,
+          "collapseState": 2,
           "children": [
             {
               "dataType": "netlist-variable",
@@ -672,208 +676,209 @@
       "dataType": "signal-group",
       "groupName": "Internal Modules",
       "collapseState": 2,
-      "children": []
-    },
-    {
-      "dataType": "signal-group",
-      "groupName": "u_add_bias",
-      "collapseState": 2,
       "children": [
         {
-          "dataType": "netlist-variable",
-          "netlistId": 148,
-          "name": "scalar_pipe.u_add_bias.data_i.[0]",
-          "numberFormat": "signed",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "[0]",
-          "renderType": "multiBit",
-          "valueLinkCommand": ""
+          "dataType": "signal-group",
+          "groupName": "u_add_bias",
+          "collapseState": 1,
+          "children": [
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 148,
+              "name": "scalar_pipe.u_add_bias.data_i.[0]",
+              "numberFormat": "signed",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "[0]",
+              "renderType": "multiBit",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 138,
+              "name": "scalar_pipe.u_add_bias.bias_i.[0]",
+              "numberFormat": "signed",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "[0]",
+              "renderType": "multiBit",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 146,
+              "name": "scalar_pipe.u_add_bias.data_valid_i",
+              "numberFormat": "binary",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "data_valid_i",
+              "renderType": "binary",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 156,
+              "name": "scalar_pipe.u_add_bias.data_valid_o",
+              "numberFormat": "binary",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "data_valid_o",
+              "renderType": "binary",
+              "valueLinkCommand": ""
+            }
+          ]
         },
         {
-          "dataType": "netlist-variable",
-          "netlistId": 138,
-          "name": "scalar_pipe.u_add_bias.bias_i.[0]",
-          "numberFormat": "signed",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "[0]",
-          "renderType": "multiBit",
-          "valueLinkCommand": ""
+          "dataType": "signal-group",
+          "groupName": "u_sub_zp",
+          "collapseState": 1,
+          "children": [
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 383,
+              "name": "scalar_pipe.u_sub_zp.data_i.[0]",
+              "numberFormat": "signed",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "[0]",
+              "renderType": "multiBit",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 393,
+              "name": "scalar_pipe.u_sub_zp.data_o.[0]",
+              "numberFormat": "signed",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "[0]",
+              "renderType": "multiBit",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 373,
+              "name": "scalar_pipe.u_sub_zp.bias_i.[0]",
+              "numberFormat": "signed",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "[0]",
+              "renderType": "multiBit",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 381,
+              "name": "scalar_pipe.u_sub_zp.data_valid_i",
+              "numberFormat": "binary",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "data_valid_i",
+              "renderType": "binary",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 391,
+              "name": "scalar_pipe.u_sub_zp.data_valid_o",
+              "numberFormat": "binary",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "data_valid_o",
+              "renderType": "binary",
+              "valueLinkCommand": ""
+            }
+          ]
         },
         {
-          "dataType": "netlist-variable",
-          "netlistId": 146,
-          "name": "scalar_pipe.u_add_bias.data_valid_i",
-          "numberFormat": "binary",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "data_valid_i",
-          "renderType": "binary",
-          "valueLinkCommand": ""
-        },
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 156,
-          "name": "scalar_pipe.u_add_bias.data_valid_o",
-          "numberFormat": "binary",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "data_valid_o",
-          "renderType": "binary",
-          "valueLinkCommand": ""
-        }
-      ]
-    },
-    {
-      "dataType": "signal-group",
-      "groupName": "u_sub_zp",
-      "collapseState": 2,
-      "children": [
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 383,
-          "name": "scalar_pipe.u_sub_zp.data_i.[0]",
-          "numberFormat": "signed",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "[0]",
-          "renderType": "multiBit",
-          "valueLinkCommand": ""
-        },
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 393,
-          "name": "scalar_pipe.u_sub_zp.data_o.[0]",
-          "numberFormat": "signed",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "[0]",
-          "renderType": "multiBit",
-          "valueLinkCommand": ""
-        },
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 373,
-          "name": "scalar_pipe.u_sub_zp.bias_i.[0]",
-          "numberFormat": "signed",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "[0]",
-          "renderType": "multiBit",
-          "valueLinkCommand": ""
-        },
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 381,
-          "name": "scalar_pipe.u_sub_zp.data_valid_i",
-          "numberFormat": "binary",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "data_valid_i",
-          "renderType": "binary",
-          "valueLinkCommand": ""
-        },
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 391,
-          "name": "scalar_pipe.u_sub_zp.data_valid_o",
-          "numberFormat": "binary",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "data_valid_o",
-          "renderType": "binary",
-          "valueLinkCommand": ""
-        }
-      ]
-    },
-    {
-      "dataType": "signal-group",
-      "groupName": "u_scale_n",
-      "collapseState": 2,
-      "children": [
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 247,
-          "name": "scalar_pipe.u_scale_n.data_i.[0]",
-          "numberFormat": "signed",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "[0]",
-          "renderType": "multiBit",
-          "valueLinkCommand": ""
-        },
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 237,
-          "name": "scalar_pipe.u_scale_n.m0_i.[0]",
-          "numberFormat": "fixedpoint_u_16",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "[0]",
-          "renderType": "multiBit",
-          "valueLinkCommand": ""
-        },
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 86,
-          "name": "scalar_pipe.data_o.[0]",
-          "numberFormat": "signed",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "[0]",
-          "renderType": "multiBit",
-          "valueLinkCommand": ""
-        },
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 245,
-          "name": "scalar_pipe.u_scale_n.data_valid_i",
-          "numberFormat": "binary",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "data_valid_i",
-          "renderType": "binary",
-          "valueLinkCommand": ""
-        },
-        {
-          "dataType": "netlist-variable",
-          "netlistId": 255,
-          "name": "scalar_pipe.u_scale_n.data_valid_o",
-          "numberFormat": "binary",
-          "colorIndex": 0,
-          "rowHeight": 1,
-          "verticalScale": 1,
-          "nameType": "fullPath",
-          "customName": "data_valid_o",
-          "renderType": "binary",
-          "valueLinkCommand": ""
+          "dataType": "signal-group",
+          "groupName": "u_scale_n",
+          "collapseState": 1,
+          "children": [
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 247,
+              "name": "scalar_pipe.u_scale_n.data_i.[0]",
+              "numberFormat": "signed",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "[0]",
+              "renderType": "multiBit",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 237,
+              "name": "scalar_pipe.u_scale_n.m0_i.[0]",
+              "numberFormat": "fixedpoint_u_16",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "[0]",
+              "renderType": "multiBit",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 86,
+              "name": "scalar_pipe.data_o.[0]",
+              "numberFormat": "signed",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "[0]",
+              "renderType": "multiBit",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 245,
+              "name": "scalar_pipe.u_scale_n.data_valid_i",
+              "numberFormat": "binary",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "data_valid_i",
+              "renderType": "binary",
+              "valueLinkCommand": ""
+            },
+            {
+              "dataType": "netlist-variable",
+              "netlistId": 255,
+              "name": "scalar_pipe.u_scale_n.data_valid_o",
+              "numberFormat": "binary",
+              "colorIndex": 0,
+              "rowHeight": 1,
+              "verticalScale": 1,
+              "nameType": "fullPath",
+              "customName": "data_valid_o",
+              "renderType": "binary",
+              "valueLinkCommand": ""
+            }
+          ]
         }
       ]
     }

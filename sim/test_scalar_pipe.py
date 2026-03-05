@@ -164,11 +164,12 @@ async def test_scalar_pipe_basic(dut):
 
     # generate total_nin random transactions
     def data_generator() -> Iterator[tuple[Array[int], Array[int], Array[int], Array[int]]]:
+        bias = [random.randint(-10, 10) for _ in range(N)]
+        zp = [random.randint(-10, 10) for _ in range(N)]
+        scale = [float_to_fixed(random.random(), FIXED_SHIFT) for _ in range(N)]
+        # only data changes immediately after a transaction
         for _ in range(total_nin):
             data = [random.randint(-10, 10) for _ in range(N)]
-            bias = [random.randint(-10, 10) for _ in range(N)]
-            zp = [random.randint(-10, 10) for _ in range(N)]
-            scale = [float_to_fixed(random.random(), FIXED_SHIFT) for _ in range(N)]
             yield (data, bias, zp, scale)
 
     # emulate yes(1)
