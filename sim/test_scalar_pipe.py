@@ -20,28 +20,28 @@ class SclarPipeModel():
 
     def consume(self, dut):
         N = dut.N.value.to_unsigned()
-        data_i_n = [dut.data_i[i].value for i in range(N)]
-        bias_i_n = [dut.bias_i[i].value for i in range(N)]
-        zp_i_n = [dut.zero_point_i[i].value for i in range(N)]
-        scale_i_n = [dut.scale_i[i].value for i in range(N)]
-        self.q.append((data_i_n, bias_i_n, zp_i_n, scale_i_n))
+        data_n = [dut.data_i[i].value.to_signed() for i in range(N)]
+        bias_n = [dut.bias_i[i].value.to_signed() for i in range(N)]
+        zp_n = [dut.zero_point_i[i].value.to_signed() for i in range(N)]
+        scale_n = [dut.scale_i[i].value.to_unsigned() for i in range(N)]
+        self.q.append((data_n, bias_n, zp_n, scale_n))
 
     def produce(self, dut):
         data_o = dut.data_o
-        data_i_n, bias_i_n, zp_i_n, scale_i_n = self.q.popleft()
+        data_n, bias_n, zp_n, scale_n = self.q.popleft()
         N = dut.N.value.to_unsigned()
         FIXED_SHIFT = dut.FIXED_SHIFT.value.to_unsigned()
 
         for i in range(N):
-            data_i, bias, zp, m0 = data_i_n[i].to_signed(), bias_i_n[i].to_signed(), zp_i_n[i].to_signed(), scale_i_n[i].to_unsigned()
+            data, bias, zp, m0 = data_n[i], bias_n[i], zp_n[i], scale_n[i]
             # bias -> relu -> zero point -> quantize
             # zp is signed so we implicitly subtracts
             got = data_o[i].value.to_signed()
-            expected = quantize(relu(data_i + bias) + zp, fixed_to_float(m0, FIXED_SHIFT))
+            expected = quantize(relu(data + bias) + zp, fixed_to_float(m0, FIXED_SHIFT))
 
             # expected = max(0, inp[i].to_signed())
             cocotb.log.info(f"=== Producing output...")
-            cocotb.log.info(f"Input data: {data_i}, bias: {bias}, zero point: {zp}, scale: {fixed_to_float(m0, FIXED_SHIFT)}")
+            cocotb.log.info(f"Input data: {data}, bias: {bias}, zero point: {zp}, scale: {fixed_to_float(m0, FIXED_SHIFT)}")
             cocotb.log.info(f"Got {got}, expected {expected}")
             cocotb.log.info(f"=== Finished producing output")
             assert abs(got - expected) / (abs(expected) + 1e-12) < 0.10, f"Output mismatch at index {i}: got {got}, expected {expected}"
