@@ -194,8 +194,55 @@ async def test_scalar_pipe_basic(dut):
     dut.data_valid_i.value = 0
     await FallingEdge(clk_i)
 
+@cocotb.test()
+async def test_scalar_pipe_backpressure(dut):
+    """Test backpressure handling."""
+    clk_i = dut.clk_i
+    rst_i = dut.rst_i
+    N = dut.N.value.to_unsigned()
+    FIXED_SHIFT = dut.FIXED_SHIFT.value.to_unsigned()
+    total_nin = 10
+
+    # generate total_nin random transactions
+    def data_generator() -> Iterator[tuple[Array[int], Array[int], Array[int], Array[int]]]:
+        bias = [random.randint(-10, 10) for _ in range(N)]
+        zp = [random.randint(-10, 10) for _ in range(N)]
+        scale = [float_to_fixed(random.random(), FIXED_SHIFT) for _ in range(N)]
+        # only data changes immediately after a transaction
+        for _ in range(total_nin):
+            data = [random.randint(-10, 10) for _ in range(N)]
+            yield (data, bias, zp, scale)
+
+    # emulate yes(1)
+    def yes_generator() -> Iterator[bool]:
+        while True:
+            yield True
+
+    def backpressure_generator() -> Iterator[bool]:
+        while True:
+            # randomly apply backpressure with 20% probability
+            yield random.random() > 0.2
+
+    input_model = InputModel(dut, data_generator(), yes_generator())
+    output_model = OutputModel(dut, backpressure_generator(), total_nin)
+    m = ModelRunner(dut)
+
+    await clock_start(clk_i)
+    await reset_sequence(clk_i, rst_i)
+
+    m.start()
+    task_im = input_model.start()
+    task_om = output_model.start()
+
+    await task_om.complete
+    await FallingEdge(clk_i)
+    dut.data_ready_i.value = 0
+    dut.data_valid_i.value = 0
+    await FallingEdge(clk_i)
+
 tests = [
     "test_scalar_pipe_basic",
+    "test_scalar_pipe_backpressure"
 ]
 
 SOURCES = [
