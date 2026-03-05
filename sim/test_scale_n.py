@@ -224,10 +224,12 @@ async def scale_n_stream_test(dut):
 
     input_model = InputModel(dut, data_generator(), in_handhsake_generator())
     output_model = OutputModel(dut, generate_yes(), total_nin)
+    m = ModelRunner(dut)
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
 
+    m.start()
     task_im = input_model.start()
     task_om = output_model.start()
 
