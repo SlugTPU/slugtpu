@@ -57,7 +57,7 @@ module pe #(
         if (rst_i)
             psum_out <= '0;
         else if (act_valid)
-            psum_out <= {1'b1, psum_in + (act_in[DATA_WIDTH-1:0] * active_weight)};
+            psum_out <= {1'b1, psum_in[DATA_WIDTH-1:0] + (act_in[DATA_WIDTH-1:0] * active_weight)};
         else
             psum_out <= '0;
     end
