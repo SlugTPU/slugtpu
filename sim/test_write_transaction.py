@@ -24,7 +24,10 @@ async def test_simple(dut):
     load_ready_o = dut.load_ready_o
 
     addr_o = dut.addr_o
-    data_o =dut.data_o
+    data_o = dut.data_o
+
+    count = 8
+    sram = [-1 for _ in range(count)]
 
     await clock_start(clk_i)
     await reset_sequence(clk_i, rst_i)
@@ -39,7 +42,6 @@ async def test_simple(dut):
 
         await FallingEdge(clk_i)
 
-        count = 8
         start_addr = 0
         load_valid_i.value = 1
         amount.value = count
@@ -63,8 +65,8 @@ async def test_simple(dut):
             assert valid_o.value == 1
             assert ready_o.value == 1
             assert data_o.value == i
+            sram[addr_o.value] = int(data_o.value)
             assert addr_o.value == i+start_addr
-            await RisingEdge(clk_i)
         await FallingEdge(clk_i)
         assert load_ready_o.value == 1
         assert valid_o.value == 0
@@ -72,6 +74,7 @@ async def test_simple(dut):
         assert load_ready_o.value == 1
         assert valid_o.value == 0
         await FallingEdge(clk_i)
+        print("SRAM CONTENTS: ", sram)
     
 
 tests = [
@@ -80,14 +83,14 @@ tests = [
 
 proj_path = Path("./rtl").resolve()
 sources = [
-    proj_path / "sram/memory_transaction.sv",
+    proj_path / "sram/write_transaction.sv",
 ]
 
 @pytest.mark.parametrize("testcase", tests)
 def test_write_each(testcase):
     """Runs each test independently. Continues on test failure."""
-    run_test(parameters={}, sources=sources, module_name="test_write_transaction", hdl_toplevel="memory_transaction", testcase=testcase, sims=['icarus'])
+    run_test(parameters={}, sources=sources, module_name="test_write_transaction", hdl_toplevel="write_transaction", testcase=testcase, sims=['icarus'])
 
 def test_write_all():
     """Runs all tests sequentially in one simulation."""
-    run_test(parameters={}, sources=sources, module_name="test_write_transaction", hdl_toplevel="memory_transaction", sims=['icarus'])
+    run_test(parameters={}, sources=sources, module_name="test_write_transaction", hdl_toplevel="write_transaction", sims=['icarus'])
