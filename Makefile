@@ -33,6 +33,9 @@ test_quantizer_mul:
 test_write_transaction:
 	python3 -m pytest sim/test_write_transaction.py -s
 
+test_read_transaction:
+	python3 -m pytest sim/test_read_transaction.py -s
+
 test_relu_n:
 	python3 -m pytest sim/test_relu_n.py -s
 
