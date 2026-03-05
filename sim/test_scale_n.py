@@ -10,13 +10,14 @@ from collections import deque
 from cocotb.types import LogicArray, Logic, Array
 from collections import deque
 import random
+import math
 from shared import handshake
 
 # TODO: 
 # - test saturation behavior
 
 def float_to_fixed(f_val, frac_bits):
-    """Converts a float to a fixed-point integer."""
+    """Converts a float to a fixed-point integer with rounding."""
     scaling_factor = 1 << frac_bits 
     return int(f_val * scaling_factor + 0.5)
 
@@ -33,21 +34,27 @@ class mul_n_model():
         self.q = deque()
 
     def consume(self, dut):
-        self.q.append((dut.data_i.value, dut.m0_i.value))
+        data_i_n = [dut.data_i[i].value.to_signed() for i in range(self.N)]
+        m0_i_n = [dut.m0_i[i].value.to_unsigned() for i in range(self.N)]
+        self.q.append((data_i_n, m0_i_n))
 
     def produce(self, dut):
         data_o = dut.data_o
         inp_n, m0_n = self.q.popleft()
-        FIXED_SHIFT_P = dut.FIXED_SHIFT_P.value
+        FIXED_SHIFT_P = dut.FIXED_SHIFT_P.value.to_unsigned()
         # expected = quantized_mul_n(inp_n, m0_n, dut.ACC_WIDTH_P.value.to_unsigned(), dut.M0_WIDTH_P.value.to_unsigned(), dut.FIXED_SHIFT_P.value.to_unsigned(), self.N)
 
         for i in range(self.N):
             got = data_o[i].value.to_signed()
-            expected = inp_n[i].to_signed() * fixed_to_float(m0_n[i].to_signed(), FIXED_SHIFT_P.to_unsigned())
+            expected = max(-128, 
+                       min(127, 
+                           math.floor(inp_n[i] * fixed_to_float(m0_n[i], FIXED_SHIFT_P) + 0.5)))
 
-            cocotb.log.info(f"Producing with input {dut.data_i[i].value.to_signed()} and m0 {fixed_to_float(dut.m0_i[i].value.to_signed(), FIXED_SHIFT_P.to_unsigned())} ({fixed_to_float(dut.m0_i[i].value.to_unsigned(), FIXED_SHIFT_P.to_unsigned())})): got {got}, expected {expected}")
+            cocotb.log.info(f"Producing with input {inp_n[i]} and m0 {fixed_to_float(m0_n[i], FIXED_SHIFT_P)} ({fixed_to_float(m0_n[i], FIXED_SHIFT_P)})): got {got}, expected {expected}")
             # check for accuracy
-            assert abs(got - expected) < 0.5, f"Output mismatch at index {i}: got {got}, expected {expected}"
+            # add small epsilon to expected to avoid division by zero in assertion
+            err = abs(got - expected) / (abs(expected) + 1e-12)
+            assert err < 0.5, f"Output mismatch at index {i}: got {got}, expected {expected}"
 
 class InputModel():
     def __init__(self, dut, data_generator: Iterator[tuple[Array[int], Array[int]]], handshake_generator: Iterator[bool]):
@@ -70,11 +77,15 @@ class InputModel():
         data_i = self.dut.data_i
         m0_i = self.dut.m0_i
 
+        FIXED_SHIFT_P = self.dut.FIXED_SHIFT_P.value
+
         await FallingEdge(rst_i)
 
         # stream random
         for (d, m0) in self.data_generator:
             tx = False
+
+            print(f"InputModel: waiting to send data {d} with m0 {m0}")
 
             for i in range(self.N):
                 data_i[i].value = d[i]
@@ -85,8 +96,8 @@ class InputModel():
 
                 await RisingEdge(clk_i)
 
-                # cocotb.log.info(f"Tx input: data_i={[data_i[i].value.to_signed() for i in range(self.N)]}, m0_i={[m0_i[i].value.to_signed() for i in range(self.N)]}")
                 if valid_i.value and ready_o.value == 1:
+                    cocotb.log.info(f"Tx input: data_i={[data_i[i].value.to_signed() for i in range(self.N)]}, m0_i={[fixed_to_float(m0_i[i].value.to_signed(), FIXED_SHIFT_P.to_unsigned()) for i in range(self.N)]}")
                     self.nin += 1
                     tx = True
             await FallingEdge(clk_i)
@@ -206,13 +217,14 @@ async def scale_n_stream_test(dut):
     rst_i = dut.rst_i
 
     N = dut.N.value.to_unsigned()
+    FIXED_SHIFT_P = dut.FIXED_SHIFT_P.value.to_unsigned()
     total_nin = 10
 
     def data_generator() -> Iterator[tuple[Array[int], Array[int]]]:
         n = 0
         while n < total_nin:
             yield ([random.randint(-10, 10) for _ in range(N)], 
-                   [random.randint(0, 10) << dut.FIXED_SHIFT_P.value.to_unsigned() for _ in range(N)])
+                   [float_to_fixed(random.random(), FIXED_SHIFT_P) for _ in range(N)])
             n += 1
     def in_handhsake_generator() -> Iterator[bool]:
         while True:
