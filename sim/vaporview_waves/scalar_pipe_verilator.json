@@ -3,13 +3,9 @@
   "fileName": "/Users/raph/slugtpu/sim_build/verilator/test_scalar_pipe/test_scalar_pipe_basic/dump.fst",
   "markerTime": 22704,
   "altMarkerTime": null,
-  "selectedSignal": {
-    "name": "scalar_pipe.data_i.[0]",
-    "msb": 31,
-    "lsb": 0
-  },
+  "selectedSignal": null,
   "zoomRatio": 0.007311397110649184,
-  "scrollLeft": 50606,
+  "scrollLeft": 59906,
   "displayedSignals": [
     {
       "dataType": "signal-group",
@@ -687,7 +683,7 @@
           "dataType": "netlist-variable",
           "netlistId": 148,
           "name": "scalar_pipe.u_add_bias.data_i.[0]",
-          "numberFormat": "hexadecimal",
+          "numberFormat": "signed",
           "colorIndex": 0,
           "rowHeight": 1,
           "verticalScale": 1,
@@ -700,7 +696,7 @@
           "dataType": "netlist-variable",
           "netlistId": 138,
           "name": "scalar_pipe.u_add_bias.bias_i.[0]",
-          "numberFormat": "hexadecimal",
+          "numberFormat": "signed",
           "colorIndex": 0,
           "rowHeight": 1,
           "verticalScale": 1,
