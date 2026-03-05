@@ -26,6 +26,12 @@ def fixed_to_float(fixed_val, frac_bits):
     scaling_factor = 1 << frac_bits
     return float(fixed_val) / scaling_factor
 
+def quantize(x, m0):
+    """Matches quantizer_mul.sv: multiply, round, shift, saturate."""
+    return max(-128, 
+           min(127, 
+           math.floor(x * m0 + 0.5)))
+
 class mul_n_model():
     def __init__(self, N, width=8):
         self.N = N
@@ -46,9 +52,7 @@ class mul_n_model():
 
         for i in range(self.N):
             got = data_o[i].value.to_signed()
-            expected = max(-128, 
-                       min(127, 
-                           math.floor(inp_n[i] * fixed_to_float(m0_n[i], FIXED_SHIFT_P) + 0.5)))
+            expected = quantize(inp_n[i], fixed_to_float(m0_n[i], FIXED_SHIFT_P))
 
             cocotb.log.info(f"Producing with input {inp_n[i]} and m0 {fixed_to_float(m0_n[i], FIXED_SHIFT_P)} ({fixed_to_float(m0_n[i], FIXED_SHIFT_P)})): got {got}, expected {expected}")
             # check for accuracy
