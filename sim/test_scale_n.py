@@ -30,7 +30,7 @@ class mul_n_model():
         self.N = N
         # Assume width is 8 bits for quantization
         self.width = width
-        self.q = deque(maxlen=1)
+        self.q = deque()
 
     def consume(self, dut):
         self.q.append((dut.data_i.value, dut.m0_i.value))
