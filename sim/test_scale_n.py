@@ -217,8 +217,7 @@ async def scale_n_stream_test(dut):
     def in_handhsake_generator() -> Iterator[bool]:
         while True:
             yield random.choice([True, False])
-
-    # emulate man(1)
+    # emulate yes(1)
     def generate_yes() -> Iterator[bool]:
         while True:
             yield True
