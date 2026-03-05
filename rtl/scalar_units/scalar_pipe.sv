@@ -42,12 +42,12 @@ module scalar_pipe #(
     logic zp_valid;
     logic zp_ready;
 
-    // negate zero points for subtraction via add_n
-    logic signed [PSUM_W-1:0] neg_zp [N-1:0];
+    // // negate zero points for subtraction via add_n
+    // logic signed [PSUM_W-1:0] neg_zp [N-1:0];
 
-    for (genvar i = 0; i < N; i++) begin : gen_neg_zp
-        assign neg_zp[i] = -zero_point_i[i];
-    end
+    // for (genvar i = 0; i < N; i++) begin : gen_neg_zp
+    //     assign neg_zp[i] = -zero_point_i[i];
+    // end
 
     //s1: bias add
 
@@ -90,7 +90,7 @@ module scalar_pipe #(
     ) u_sub_zp (
         .clk_i        (clk_i),
         .rst_i        (rst_i),
-        .bias_i       (neg_zp),
+        .bias_i       (zero_point_i), // reuse add_n with zero_point as "bias" for subtraction
         .data_i       (relu_data),
         .data_valid_i (relu_valid),
         .data_ready_i (zp_ready),
