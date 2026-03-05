@@ -16,6 +16,7 @@ module quantizer_mul #(
     logic signed [ACC_WIDTH+M0_WIDTH-1:0] shifted;
 
     // Multiply
+    // m0 is unsigned, but we want a signed product, so we need to cast m0 to signed with an extra leading 0 bit to preserve signness of the product
     assign product = psum * $signed({ 1'b0, m0 });
 
     // Fixed Rounding (effective adds +0.5 to shifted result)
