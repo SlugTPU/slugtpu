@@ -17,8 +17,8 @@ module pe #(
     input  logic act_valid,
     output logic act_valid_o,
 
-    input  logic [ACC_WIDTH-1:0]  psum_in,
-    output logic [ACC_WIDTH-1:0]  psum_out
+    input  logic [ACC_WIDTH:0]  psum_in,
+    output logic [ACC_WIDTH:0]  psum_out
 );
 
     logic weight_sel, act_sel, weight_edge, prev_weight_sel;
@@ -57,7 +57,7 @@ module pe #(
         if (rst_i)
             psum_out <= '0;
       else if (act_valid)
-            psum_out <= psum_in + (act_in[DATA_WIDTH-1:0] * active_weight);
+            psum_out <= {1'b1, psum_in + (act_in[DATA_WIDTH-1:0] * active_weight)};
     end
 
     // pass through activation
