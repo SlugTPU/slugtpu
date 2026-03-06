@@ -45,7 +45,6 @@ module pe #(
         if (rst_i) begin
             weight_buf[0] <= '0;
             weight_buf[1] <= '0;
-            prev_weight_sel <= '0;
         end else if (weight_valid)
             weight_buf[weight_sel] <= weight_in;
     end
