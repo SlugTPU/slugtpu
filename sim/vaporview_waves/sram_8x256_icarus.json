@@ -1,0 +1,120 @@
+{
+  "extensionVersion": "1.5.0",
+  "fileName": "/Users/raph/slugtpu/sim_build/icarus/test_sram/test_random_access/sram_8x256.fst",
+  "markerTime": 1398520,
+  "altMarkerTime": null,
+  "selectedSignal": {
+    "name": "sram_8x256.rd_data_o",
+    "msb": 63,
+    "lsb": 0
+  },
+  "zoomRatio": 0.023013431823888267,
+  "scrollLeft": 1388656,
+  "displayedSignals": [
+    {
+      "dataType": "signal-group",
+      "groupName": "Global",
+      "collapseState": 2,
+      "children": [
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 1,
+          "name": "sram_8x256.clk_i",
+          "numberFormat": "binary",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "clk_i",
+          "renderType": "binary",
+          "valueLinkCommand": ""
+        },
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 3,
+          "name": "sram_8x256.rst_i",
+          "numberFormat": "binary",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "rst_i",
+          "renderType": "binary",
+          "valueLinkCommand": ""
+        }
+      ]
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Address",
+      "collapseState": 2,
+      "children": [
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 0,
+          "name": "sram_8x256.addr_i",
+          "numberFormat": "hexadecimal",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "addr_i",
+          "renderType": "multiBit",
+          "valueLinkCommand": ""
+        }
+      ]
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Write",
+      "collapseState": 2,
+      "children": [
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 5,
+          "name": "sram_8x256.wr_data_i",
+          "numberFormat": "hexadecimal",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "wr_data_i",
+          "renderType": "multiBit",
+          "valueLinkCommand": ""
+        },
+        {
+          "dataType": "netlist-variable",
+          "netlistId": 4,
+          "name": "sram_8x256.rw_mode_i",
+          "numberFormat": "binary",
+          "colorIndex": 0,
+          "rowHeight": 1,
+          "verticalScale": 1,
+          "nameType": "fullPath",
+          "customName": "rw_mode_i",
+          "renderType": "binary",
+          "valueLinkCommand": ""
+        }
+      ]
+    },
+    {
+      "dataType": "signal-group",
+      "groupName": "Read",
+      "collapseState": 2,
+      "children": []
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 6,
+      "name": "sram_8x256.rd_data_o",
+      "numberFormat": "hexadecimal",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "rd_data_o",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    }
+  ]
+}
