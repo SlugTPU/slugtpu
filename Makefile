@@ -1,4 +1,5 @@
 export WAVES=1
+RTL_FILES := $(shell find rtl/ -name "*.sv")
 
 test_fifo:
 	python3 -m pytest sim/test_fifo.py -s
@@ -56,6 +57,9 @@ test_subzp:
 
 test_sysray:
 	python3 -m pytest sim/test_sysray.py -s
+
+lint:
+	verilator --lint-only -Wall --sv $(RTL_FILES)
 
 clean:
 	rm -rf sim_build
