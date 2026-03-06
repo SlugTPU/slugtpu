@@ -563,15 +563,19 @@ def test_my_module_all():
 
 ## Running Tests
 
-```bash
-# Run all tests for one module
-cd sim && pytest test_my_module.py -v
+Add an entry to the root `Makefile`:
 
-# Run only a specific test case
-cd sim && pytest test_my_module.py -k test_my_module_basic -v
-
-# Run a parameterized case by name
-cd sim && pytest "test_my_module.py::test_my_module_each[test_my_module_basic]" -v
+```makefile
+test_my_module:
+	python3 -m pytest sim/test_my_module.py -s
 ```
+
+Then run from the project root:
+
+```bash
+make test_my_module
+```
+
+The `-s` flag passes stdout through so cocotb log output is visible in the terminal.
 
 Waveforms are saved to `sim/sim_build/<simulator>/<module>/<testcase>/` as `.fst` files (Verilator) or `.vcd` files (Icarus).
