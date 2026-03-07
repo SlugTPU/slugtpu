@@ -325,6 +325,30 @@ def data_generator():
         yield (data, bias, scale)
 ```
 
+### Reset test
+
+Every testbench should include a `reset_test` as its first test case. It verifies that the DUT comes out of reset with all outputs in their idle/zero state and that `reset_sequence` completes without error.
+
+**Key rules:**
+- Do **not** zero-initialize inputs before reset. `reset_sequence` holds `rst_i` high for several cycles, which forces all internal state to its reset values regardless of what the inputs are doing.
+- `await FallingEdge(dut.rst_i)` after `reset_sequence` to wait for the reset signal itself to deassert before sampling outputs.
+- Only assert on outputs that are architecturally defined to be 0 (or idle) after reset — do not assert on `X`/`Z` values.
+
+```python
+@cocotb.test()
+async def reset_test(dut):
+    """Verify outputs are idle after reset with no inputs driven."""
+    await clock_start(dut.clk_i)
+    await reset_sequence(dut.clk_i, dut.rst_i)
+    await FallingEdge(dut.rst_i)
+```
+
+Add `"reset_test"` as the **first entry** in the `tests` list so it always runs first:
+
+```python
+tests = ["reset_test", "test_my_module_basic", ...]
+```
+
 ### Backpressure test
 
 Use `yes_generator` on input and `backpressure_generator` on output (or vice versa). The test structure is otherwise identical:
