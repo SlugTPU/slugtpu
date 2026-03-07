@@ -18,14 +18,25 @@ module sysray_2x2 #(
   input logic act_valid1,
 
   output logic [ACC_WIDTH-1:0] psum_out1,
-  output logic [ACC_WIDTH-1:0] psum_out2
+  output logic psum_out1_valid_o,
+  output logic [ACC_WIDTH-1:0] psum_out2,
+  output logic psum_out2_valid_o
 );
 
   logic [DATA_WIDTH:0]  act00_out;
+  logic                 act_valid00_out;
+  logic [DATA_WIDTH:0]  act_10_out;
+  logic                 act_valid10_out;
+
   logic [DATA_WIDTH:0]  weight00_out;
   logic                 weight_valid00_out;
-  logic                 act_valid00_out;
   logic [ACC_WIDTH-1:0] psum_00_out;              
+  logic [DATA_WIDTH:0]  weight01_out;
+  logic                 weight_valid01_out;
+  logic [ACC_WIDTH-1:0] psum_01_out;
+
+  logic psum_valid_00_out, psum_valid_01_out;
+
 
   pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe00 (
     .clk_i(clk_i),
@@ -38,13 +49,11 @@ module sysray_2x2 #(
     .weight_valid_o(weight_valid00_out),
     .act_valid(act_valid0),
     .act_valid_o(act_valid00_out),
-    .psum_in({ACC_WIDTH{1'b0}}),
-    .psum_out(psum_00_out)
+    .psum_in({ACC_WIDTH{1'b0}}), // start with zero psum
+    .psum_valid_i(1'b1),
+    .psum_out(psum_00_out),
+    .psum_valid_o(psum_valid_00_out)
   );
-
-  logic [DATA_WIDTH:0]  weight01_out;
-  logic                 weight_valid01_out;
-  logic [ACC_WIDTH-1:0] psum_01_out;
 
   pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe01 (
     .clk_i(clk_i),
@@ -57,13 +66,13 @@ module sysray_2x2 #(
     .weight_valid_o(weight_valid01_out),
     .act_valid(act_valid00_out),
     .act_valid_o(),
-    .psum_in({ACC_WIDTH{1'b0}}),
-    .psum_out(psum_01_out)
+    .psum_in({ACC_WIDTH{1'b0}}), // start with zero psum
+    .psum_valid_i(1'b1),
+    .psum_out(psum_01_out),
+    .psum_valid_o(psum_valid_01_out)
   );
 
-  logic [DATA_WIDTH:0]  act_10_out;
-  logic                 act_valid10_out;
-  logic [ACC_WIDTH-1:0] psum_10_out;
+  // logic [ACC_WIDTH-1:0] psum_10_out;
 
   pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe10 (
     .clk_i(clk_i),
@@ -77,10 +86,12 @@ module sysray_2x2 #(
     .act_valid(act_valid1),
     .act_valid_o(act_valid10_out),
     .psum_in(psum_00_out),
-    .psum_out(psum_10_out)
+    .psum_valid_i(psum_valid_00_out),
+    .psum_out(psum_out1),
+    .psum_valid_o(psum_out1_valid_o)
   );
 
-  logic [ACC_WIDTH-1:0] psum_11_out;
+  // logic [ACC_WIDTH-1:0] psum_11_out;
 
   pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe11 (
     .clk_i(clk_i),
@@ -94,10 +105,12 @@ module sysray_2x2 #(
     .act_valid(act_valid10_out),
     .act_valid_o(),
     .psum_in(psum_01_out),
-    .psum_out(psum_11_out)
+    .psum_valid_i(psum_valid_01_out),
+    .psum_out(psum_out2),
+    .psum_valid_o(psum_out2_valid_o)
   );
 
-  assign psum_out1 = psum_10_out;
-  assign psum_out2 = psum_11_out;
+  // assign psum_out1 = psum_10_out[ACC_WIDTH-1:0];
+  // assign psum_out2 = psum_11_out[ACC_WIDTH-1:0];
 
 endmodule
