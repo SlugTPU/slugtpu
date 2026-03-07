@@ -7,19 +7,17 @@ module sysray_2x2 #(
 
   input logic [DATA_WIDTH:0] act0,
   input logic [DATA_WIDTH:0] act1,
-
-  input logic [DATA_WIDTH:0] weight0,
-  input logic [DATA_WIDTH:0] weight1,
-
-  input logic weight_valid0,
-  input logic weight_valid1,
-
   input logic act_valid0,
   input logic act_valid1,
 
+  input logic [DATA_WIDTH:0] weight0,
+  input logic [DATA_WIDTH:0] weight1,
+  input logic weight_valid0,
+  input logic weight_valid1,
+
   output logic [ACC_WIDTH-1:0] psum_out1,
-  output logic psum_out1_valid_o,
   output logic [ACC_WIDTH-1:0] psum_out2,
+  output logic psum_out1_valid_o,
   output logic psum_out2_valid_o
 );
 
