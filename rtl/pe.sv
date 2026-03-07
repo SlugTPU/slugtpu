@@ -17,8 +17,10 @@ module pe #(
     input  logic act_valid,
     output logic act_valid_o,
 
-    input  logic [ACC_WIDTH:0]  psum_in,
-    output logic [ACC_WIDTH:0]  psum_out
+    input  logic [ACC_WIDTH-1:0]  psum_in,
+    input  logic psum_valid_i,
+    output logic [ACC_WIDTH-1:0]  psum_out,
+    output  logic psum_valid_o
 );
 
     logic weight_sel, act_sel, weight_edge, prev_weight_sel;
@@ -56,7 +58,7 @@ module pe #(
         if (rst_i)
             psum_out <= '0;
         else if (act_valid)
-            psum_out <= {1'b1, psum_in[ACC_WIDTH-1:0] + (act_in[DATA_WIDTH-1:0] * active_weight)};
+            psum_out <=  psum_in[ACC_WIDTH-1:0] + (act_in[DATA_WIDTH-1:0] * active_weight);
         else
             psum_out <= '0;
     end
