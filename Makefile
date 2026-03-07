@@ -55,13 +55,14 @@ test_load:
 test_subzp:
 	python3 -m pytest sim/test_subzp.py -s
 
-test_sysray:
-	python3 -m pytest sim/test_sysray.py -s
+test_sysray_2x2:
+	python3 -m pytest sim/test_sysray_2x2.py -s
 
 lint:
+	@echo "=== Linting $(RTL_FILES)... ===" 
 	verilator --lint-only -Wall --sv $(RTL_FILES)
 
 clean:
 	rm -rf sim_build
 
-.PHONY: test_fifo test_spi test_bias test_tpuspi test_scalar_load test_add_n clean
+.PHONY: test_fifo test_spi test_bias test_tpuspi test_scalar_load test_add_n test_sysray_2x2 clean
