@@ -1,69 +1,74 @@
+// Direct SRAM interface
+// TRANSACTION MODE IS 0 FOR READ, 1 FOR WRITE
 module memory_transaction #(
     parameter counter_width = 8,
-    parameter address_width = 8,
-    parameter data_width = 64
-) (
+    parameter address_width = 8
+)(
     input clk_i,
     input rst_i,
 
-    input [data_width-1:0] data_i,
+    // IO to SRAM module
+    output [address_width-1:0] sram_addr_o,
+    output logic sram_rw_mode_o,
 
-    input ready_i,
-    input valid_i,
-    output logic valid_o,
+    input  downstream_ready_i,
     output logic ready_o,
 
-    input [address_width-1:0] addr_i,
-    input [counter_width-1:0] transaction_amount_i,
-    input load_valid_i,
-    output load_ready_o,
-
-    output logic [address_width-1:0] addr_o,
-    output logic [data_width-1:0] data_o
+    input  [address_width-1:0] addr_i,
+    input  [counter_width-1:0] transaction_amount_i,
+    input  transaction_rw_mode_i,
+    input  load_valid_i,
+    output load_ready_o
 );
 
     logic [counter_width-1:0] current_count_q, transaction_amount_q, current_count_d;
-    logic [address_width-1:0] addr_d;
-    logic in_use;
+    logic [address_width-1:0] addr_d, addr_q;
+    logic in_use, rw_mode;
+
+    assign sram_addr_o = addr_d;
 
     assign load_ready_o = ~in_use;
 
-    assign valid_o = in_use & valid_i;
-
-    assign ready_o = in_use & ready_i;
-
-    always_comb begin
-        data_o = data_i;
-    end
+    assign ready_o = in_use & downstream_ready_i;
     
     always_comb begin
-        addr_d = addr_o;
+        addr_d = addr_q;
         current_count_d = current_count_q;
-        if (valid_o & ready_i) begin
+        if (downstream_ready_i & in_use) begin
             current_count_d = current_count_q + 1'b1;
-            addr_d = addr_o + 1'b1;
+            addr_d = addr_q + 1'b1;
         end
+    end
+
+    always_comb begin
+        sram_rw_mode_o = '0;
+        if (in_use & downstream_ready_i )
+            sram_rw_mode_o = rw_mode;
     end
 
     always_ff @( posedge clk_i ) begin
         if(rst_i) begin
             current_count_q <= '0;
-            addr_o <= '0;
+            addr_q <= '0;
             in_use <= '0;
+            rw_mode <= '0;
         end else if(load_valid_i & ~in_use) begin
             current_count_q <= '0;
             transaction_amount_q <= transaction_amount_i;
             in_use <= '1; 
-            addr_o <= '0;
+            addr_q <= addr_i;
+            rw_mode <= transaction_rw_mode_i;
         end else begin
             current_count_q <= current_count_d;           
-            addr_o <= addr_d;
+            addr_q <= addr_d;
 
-            if (valid_o & ready_i &
-                (current_count_d == transaction_amount_q)) begin
+            if (in_use & downstream_ready_i &
+                // if it is a read transaction, we add one for some reason I used to know
+                (current_count_d + (rw_mode ? 0 : 1) == transaction_amount_q)) begin
                 in_use <= 1'b0;
+                rw_mode <= '0;
             end
         end
     end
-    
+
 endmodule

@@ -35,6 +35,8 @@ module sram_mux #(
 
     assign rd_valid_o = which_reader;
     assign wr_ready_o = which_writer;
+    assign unified_read_buffer_o = sram_rd_data_i;
+    assign sram_wr_data_o = unified_write_buffer_i;
 
     always_ff @( posedge clk_i ) begin
         if(rst_i) begin
@@ -42,7 +44,9 @@ module sram_mux #(
             which_writer <= '1;
             rw_mode <= '0;
             in_use <= '0;
-        end else if(~in_use & which_reader )
+        end else if(~in_use & |which_reader ) begin
+            
+        end
     end
 
     
