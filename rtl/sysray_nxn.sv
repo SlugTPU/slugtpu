@@ -19,9 +19,9 @@ module sysray_nxn #(
   output logic                   psum_out_valid_n_o    [N-1:0]
 );
 
-logic [DATA_WIDTH-1:0] w_conn          [N:0][N:0];
+logic [DATA_WIDTH:0]   w_conn          [N:0][N:0];
 logic                  w_valid_conn    [N:0][N:0];
-logic [DATA_WIDTH-1:0] a_conn          [N:0][N:0];
+logic [DATA_WIDTH:0]   a_conn          [N:0][N:0];
 logic                  a_valid_conn    [N:0][N:0];
 logic [ACC_WIDTH-1:0]  psum_conn       [N:0][N:0];
 logic                  psum_valid_conn [N:0][N:0];
@@ -31,18 +31,19 @@ generate
   for (i = 0 ; i < N; i++) begin
     for (j = 0; j < N; j++) begin
       if (i == 0) begin
-        assign w_conn[i][j] = weight_n_i[j];
+        assign w_conn[i][j] = {1'b0, weight_n_i[j]};
         assign w_valid_conn[i][j] = weight_valid_n_i[j];
-      end 
-      if (j == 0) begin
-        assign a_conn[i][j] = act_n_i[i];
-        assign a_valid_conn[i][j] = act_valid_n_i[i]; 
-      end
-      if (i == 0 && j == 0) begin
         assign psum_conn[i][j] = '0;
         assign psum_valid_conn[i][j] = 1'b1;
+      end else if (i == N-1) begin
+        assign psum_out_n_o[j]       = psum_conn[i+1][j];
+        assign psum_out_valid_n_o[j] = psum_valid_conn[i+1][j];
       end
-      
+      if (j == 0) begin
+        assign a_conn[i][j] = {1'b0, act_n_i[i]};
+        assign a_valid_conn[i][j] = act_valid_n_i[i];
+      end
+
       pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe_ij (
         .clk_i(clk_i),
         .rst_i(rst_i),
@@ -56,8 +57,8 @@ generate
         .act_valid_o(a_valid_conn[i][j+1]),
         .psum_i(psum_conn[i][j]),
         .psum_valid_i(psum_valid_conn[i][j]),
-        .psum_o(psum_conn[i+1][j+1]),
-        .psum_valid_o(psum_valid_conn[i+1][j+1])
+        .psum_o(psum_conn[i+1][j]),
+        .psum_valid_o(psum_valid_conn[i+1][j])
       );
     end  
   end

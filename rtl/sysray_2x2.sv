@@ -93,10 +93,10 @@ module sysray_2x2 #(
 
   pe #(.DATA_WIDTH(DATA_WIDTH), .ACC_WIDTH(ACC_WIDTH)) pe11 (
     .clk_i(clk_i),
-    .rst_i(rst_i),
+    .rst_i(rst_i)
+    .weight_i(weight,
     .act_i(act_10_out),
-    .act_o(),
-    .weight_i(weight01_out),
+    .act_o(),01_out),
     .weight_o(),
     .weight_valid_i(weight_valid01_out),
     .weight_valid_o(),
