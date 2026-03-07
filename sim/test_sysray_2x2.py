@@ -169,12 +169,12 @@ async def test_basic_flow(dut):
 tests = ["test_basic_flow"]
 
 proj_path = Path("./rtl").resolve()
-sources = [ proj_path/"pe_test"/"sysray"/"sysray.sv", proj_path/"pe_test"/"sysray"/"pe.sv" ]
+sources = [ proj_path/"sysray_2x2.sv", proj_path/"pe.sv" ]
 
 @pytest.mark.parametrize("testcase", tests)
 def test_sysray_each(testcase):
     """Runs each test independently. Continues on test failure"""
-    run_test(parameters={}, sources=sources, module_name="test_sysray", hdl_toplevel="sysray", testcase=testcase)
+    run_test(parameters={}, sources=sources, module_name="test_sysray_2x2", hdl_toplevel="sysray_2x2", testcase=testcase)
 
 # TODO: add more tests
 # - test backpressure
@@ -185,4 +185,4 @@ def test_sysray_all():
     # debug print parameters can be idea if a simulator fails silently without telling you why
     # print(f"DEBUG PARAMETERs: {depth_p}")
 
-    run_test(parameters={}, sources=sources, module_name="test_sysray", hdl_toplevel="sysray")
+    run_test(parameters={}, sources=sources, module_name="test_sysray_2x2", hdl_toplevel="sysray_2x2")
