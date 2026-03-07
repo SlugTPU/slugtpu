@@ -20,7 +20,9 @@ module sysray_nxn #(
 );
 
 logic [DATA_WIDTH:0]   w_conn          [N:0][N:0];
+/* verilator lint_off UNOPTFLAT */  // acyclic: index strictly increases through generate loop
 logic                  w_valid_conn    [N:0][N:0];
+/* verilator lint_on UNOPTFLAT */
 logic [DATA_WIDTH:0]   a_conn          [N:0][N:0];
 logic                  a_valid_conn    [N:0][N:0];
 logic [ACC_WIDTH-1:0]  psum_conn       [N:0][N:0];

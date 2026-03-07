@@ -1,9 +1,9 @@
 import random
 import cocotb
-from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, FallingEdge
+from cocotb.triggers import FallingEdge
 from pathlib import Path
 import pytest
+from shared import clock_start, reset_sequence
 from runner import run_test
 
 
@@ -20,20 +20,6 @@ def matmul_ref(acts, weights):
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
-
-async def do_reset(dut, N):
-    dut.rst_i.value = 1
-    for i in range(N):
-        dut.act_n_i[i].value     = 0
-        dut.act_valid_n_i[i].value   = 0
-        dut.weight_n_i[i].value  = 0
-        dut.weight_valid_n_i[i].value = 0
-        dut.psum_n_i[i].value    = 0
-        dut.psum_valid_n_i[i].value  = 0
-    await RisingEdge(dut.clk_i)
-    await RisingEdge(dut.clk_i)
-    dut.rst_i.value = 0
-    await RisingEdge(dut.clk_i)
 
 
 async def load_weights(dut, N, weights):
@@ -98,6 +84,15 @@ async def stream_activations(dut, N, acts):
 # ---------------------------------------------------------------------------
 
 @cocotb.test()
+async def reset_test(dut):
+    """Verify that all psum outputs are 0 after reset with no inputs driven."""
+    N = dut.N.value.to_unsigned()
+    await clock_start(dut.clk_i)
+    await reset_sequence(dut.clk_i, dut.rst_i)
+    await FallingEdge(dut.rst_i)
+
+
+@cocotb.test()
 async def test_basic_matmul(dut):
     """
     Fixed-value vector-matrix multiply for manual verification.
@@ -109,22 +104,18 @@ async def test_basic_matmul(dut):
       psum_out[0] = 1*1 + 2*2 = 5
       psum_out[1] = 1*2 + 2*4 = 10
 
-    Pipeline timing (correct implementation, psum flows straight down):
-      Column j output is valid 2*N - 1 cycles after the first activation enters.
-      We sample after 3*N falling edges to give plenty of margin.
+    Sampling: column j output is valid exactly j+1 falling edges after
+    stream_activations ends (psum flows straight down, one column per cycle).
     """
-    cocotb.start_soon(Clock(dut.clk_i, 10, unit="ns").start())
     N = dut.N.value.to_unsigned()
-    await do_reset(dut, N)
+    await clock_start(dut.clk_i)
+    await reset_sequence(dut.clk_i, dut.rst_i)
 
     acts    = list(range(1, N + 1))
     weights = [[(i + 1) * (j + 1) for j in range(N)] for i in range(N)]
     expected = matmul_ref(acts, weights)
 
-    cocotb.log.info(f"N={N}")
-    cocotb.log.info(f"acts    = {acts}")
-    cocotb.log.info(f"weights = {weights}")
-    cocotb.log.info(f"expected psum_out = {expected}")
+    cocotb.log.info(f"N={N}, acts={acts}, weights={weights}, expected={expected}")
 
     await load_weights(dut, N, weights)
     await stream_activations(dut, N, acts)
@@ -144,8 +135,6 @@ async def test_basic_matmul(dut):
         cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {expected[j]})")
         assert got == expected[j], f"column {j}: expected {expected[j]}, got {got}"
 
-    cocotb.log.info("PASS: test_basic_matmul")
-
 
 @cocotb.test()
 async def test_random_matmul(dut):
@@ -155,18 +144,15 @@ async def test_random_matmul(dut):
     Values are capped at 15 so N * 15 * 15 = 225*N stays well within
     the 32-bit accumulator (ACC_WIDTH=32).
     """
-    cocotb.start_soon(Clock(dut.clk_i, 10, unit="ns").start())
     N = dut.N.value.to_unsigned()
-    await do_reset(dut, N)
+    await clock_start(dut.clk_i)
+    await reset_sequence(dut.clk_i, dut.rst_i)
 
     acts    = [random.randint(0, 15) for _ in range(N)]
     weights = [[random.randint(0, 15) for _ in range(N)] for _ in range(N)]
     expected = matmul_ref(acts, weights)
 
-    cocotb.log.info(f"N={N}")
-    cocotb.log.info(f"acts    = {acts}")
-    cocotb.log.info(f"weights = {weights}")
-    cocotb.log.info(f"expected psum_out = {expected}")
+    cocotb.log.info(f"N={N}, acts={acts}, weights={weights}, expected={expected}")
 
     await load_weights(dut, N, weights)
     await stream_activations(dut, N, acts)
@@ -181,14 +167,12 @@ async def test_random_matmul(dut):
         cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {expected[j]})")
         assert got == expected[j], f"column {j}: expected {expected[j]}, got {got}"
 
-    cocotb.log.info("PASS: test_random_matmul")
-
-
 # ---------------------------------------------------------------------------
 # Pytest boilerplate
 # ---------------------------------------------------------------------------
 
 tests = [
+    "reset_test",
     "test_basic_matmul",
     "test_random_matmul",
 ]
