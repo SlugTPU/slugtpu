@@ -61,6 +61,9 @@ test_sysray_2x2:
 test_sysray_nxn:
 	python3 -m pytest sim/test_sysray_nxn.py -s
 
+test_activation_sram:
+	python3 -m pytest sim/test_activation_sram.py -s
+
 lint:
 	@echo "=== Linting $(RTL_FILES)... ===" 
 	verilator --lint-only -Wall --sv $(RTL_FILES)

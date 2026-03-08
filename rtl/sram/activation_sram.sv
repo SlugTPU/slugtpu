@@ -31,7 +31,7 @@ module activation_sram
         .addr_i(sram_addr),
         .wr_data_i(wr_data_i),
         .rd_data_o(rd_data_o),
-        .en_i('1),
+        .en_i(~rst_i),
         .rw_mode_i(sram_rw_mode)
     );
 
@@ -46,8 +46,8 @@ module activation_sram
         .sram_rw_mode_o(sram_rw_mode),
 
         .downstream_ready_i(downstream_ready_i),
-        .ready_o(downstream_ready_o)
-        
+        .ready_o(downstream_ready_o),
+
         .addr_i(addr_i),
         .transaction_amount_i(transaction_amount_i),
         .transaction_rw_mode_i(transaction_rw_mode_i),

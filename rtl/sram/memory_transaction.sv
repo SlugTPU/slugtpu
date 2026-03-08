@@ -8,7 +8,7 @@ module memory_transaction #(
     input rst_i,
 
     // IO to SRAM module
-    output [address_width-1:0] sram_addr_o,
+    output logic [address_width-1:0] sram_addr_o,
     output logic sram_rw_mode_o,
 
     input  downstream_ready_i,
@@ -23,13 +23,18 @@ module memory_transaction #(
 
     logic [counter_width-1:0] current_count_q, transaction_amount_q, current_count_d;
     logic [address_width-1:0] addr_d, addr_q;
-    logic in_use, rw_mode;
+    logic in_use, rw_mode, in_use_slow;
 
-    assign sram_addr_o = addr_d;
+    // assign sram_addr_o = addr_q;
+    
+    always_ff @( negedge clk_i ) begin
+        sram_addr_o <= addr_q;
+        sram_rw_mode_o <= rw_mode;
+    end
 
     assign load_ready_o = ~in_use;
 
-    assign ready_o = in_use & downstream_ready_i;
+    assign ready_o = in_use;
     
     always_comb begin
         addr_d = addr_q;
@@ -40,11 +45,11 @@ module memory_transaction #(
         end
     end
 
-    always_comb begin
-        sram_rw_mode_o = '0;
-        if (in_use & downstream_ready_i )
-            sram_rw_mode_o = rw_mode;
-    end
+    // always_comb begin
+    //     sram_rw_mode_o = '0;
+    //     if (in_use & downstream_ready_i )
+    //         sram_rw_mode_o = rw_mode;
+    // end
 
     always_ff @( posedge clk_i ) begin
         if(rst_i) begin
@@ -52,6 +57,7 @@ module memory_transaction #(
             addr_q <= '0;
             in_use <= '0;
             rw_mode <= '0;
+            in_use_slow <= '0;
         end else if(load_valid_i & ~in_use) begin
             current_count_q <= '0;
             transaction_amount_q <= transaction_amount_i;
@@ -61,10 +67,11 @@ module memory_transaction #(
         end else begin
             current_count_q <= current_count_d;           
             addr_q <= addr_d;
+            in_use_slow <= in_use;
 
             if (in_use & downstream_ready_i &
                 // if it is a read transaction, we add one for some reason I used to know
-                (current_count_d + (rw_mode ? 0 : 1) == transaction_amount_q)) begin
+                (current_count_d  == transaction_amount_q)) begin
                 in_use <= 1'b0;
                 rw_mode <= '0;
             end
