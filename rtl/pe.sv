@@ -55,12 +55,16 @@ module pe #(
     assign active_weight = weight_buf[act_sel][DATA_WIDTH-1:0];
 
     always_ff @(posedge clk_i) begin
-        if (rst_i)
+        if (rst_i) begin
             psum_o <= '0;
-        else if (act_valid_i)
-            psum_o <=  psum_i[ACC_WIDTH-1:0] + (act_i[DATA_WIDTH-1:0] * active_weight);
-        else
+            psum_valid_o <= 1'b0;
+        end else if (act_valid_i & psum_valid_i) begin // only update psum if both inputs are valid
+            psum_o <=  (psum_i[ACC_WIDTH-1:0] + (act_i[DATA_WIDTH-1:0] * active_weight));
+            psum_valid_o <= 1'b1;
+        end else begin
             psum_o <= '0;
+            psum_valid_o <= 1'b0;
+        end
     end
 
     // pass through activation
