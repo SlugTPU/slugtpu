@@ -13,6 +13,7 @@ module memory_transaction #(
 
     input  downstream_ready_i,
     output logic ready_o,
+    output logic rd_valid_o,
 
     input  [address_width-1:0] addr_i,
     input  [counter_width-1:0] transaction_amount_i,
@@ -23,7 +24,7 @@ module memory_transaction #(
 
     logic [counter_width-1:0] current_count_q, transaction_amount_q, current_count_d;
     logic [address_width-1:0] addr_d, addr_q;
-    logic in_use, rw_mode, in_use_slow;
+    logic in_use, rw_mode;
 
     // assign sram_addr_o = addr_q;
     
@@ -57,7 +58,7 @@ module memory_transaction #(
             addr_q <= '0;
             in_use <= '0;
             rw_mode <= '0;
-            in_use_slow <= '0;
+            rd_valid_o <= '0;
         end else if(load_valid_i & ~in_use) begin
             current_count_q <= '0;
             transaction_amount_q <= transaction_amount_i;
@@ -67,7 +68,7 @@ module memory_transaction #(
         end else begin
             current_count_q <= current_count_d;           
             addr_q <= addr_d;
-            in_use_slow <= in_use;
+            rd_valid_o <= ready_o & ~rw_mode;
 
             if (in_use & downstream_ready_i &
                 // if it is a read transaction, we add one for some reason I used to know

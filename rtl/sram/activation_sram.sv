@@ -10,6 +10,7 @@ module activation_sram
 
     input  downstream_ready_i,
     output logic downstream_ready_o,
+    output rd_valid_o,
 
     input  [address_width-1:0] addr_i,
     input  [counter_width-1:0] transaction_amount_i,
@@ -47,6 +48,7 @@ module activation_sram
 
         .downstream_ready_i(downstream_ready_i),
         .ready_o(downstream_ready_o),
+        .rd_valid_o(rd_valid_o),
 
         .addr_i(addr_i),
         .transaction_amount_i(transaction_amount_i),
