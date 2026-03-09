@@ -139,47 +139,56 @@ async def stream_and_collect(dut, N, acts, sel=0):
 
 async def stream_activation_matrix(dut, N, act_matrix, sel=0):
     """
-    Stream an M×N activation matrix through the systolic array, pipelined.
+    Stream an M×N activation matrix through the systolic array with diagonal pipelining.
 
-    Rows are streamed back-to-back with no inter-row gap: row m+1 starts
-    immediately after row m's last stagger element.  Drive and sample happen
-    in the same loop — no coroutines needed.
+    At each cycle c, every array row i that has a valid vector in flight is driven
+    simultaneously: vector m = c - i is active on row i when 0 ≤ m < M.  This
+    fills the array on a diagonal wavefront — no bubbles between vectors.
 
-    Timing: col j of row m fires at posedge (m+1)*N + j.  Since j < N, all of
-    row m's outputs precede row m+1's col 0, so outputs arrive in strict
-    row-major order and are appended to a flat list then reshaped.
+    Drive schedule (N=2, M=2 example):
+      cycle 0: row0 = act[0][0]
+      cycle 1: row0 = act[1][0],  row1 = act[0][1]   ← two rows active at once
+      cycle 2:                    row1 = act[1][1]
 
-    The loop runs for M*N + N FallingEdges:
-      - Cycles 0 .. M*N-1 : drive staggered elements of each row
-      - Cycles M*N .. M*N+N-1 : inputs deasserted; drain last row's outputs
+    Total drive cycles = M + N - 1 (vs M*N for sequential).
+
+    Output timing: col j of vector m fires at FallingEdge m + N + j.  Multiple
+    columns can be valid on the same cycle, so results are indexed directly via
+    m = cycle - N - j rather than collected in a flat list.
+
+    The loop runs for M + 2*N - 1 FallingEdges:
+      - Cycles 0 .. M+N-2  : drive (diagonal wavefront)
+      - Cycles M+N-1 .. M+2N-2 : inputs idle; drain last vector's outputs
 
     Returns an M×N list of output rows.
     """
     M = len(act_matrix)
-    flat = []
+    results = [[None] * N for _ in range(M)]
 
-    for cycle in range(M * N + N):
+    for cycle in range(M + 2 * N - 1):
         await FallingEdge(dut.clk_i)
 
-        # Drive: row m, stagger position i
-        m, stagger = divmod(cycle, N)
+        # Drive: row i carries vector m = cycle - i when in range
         for i in range(N):
+            m = cycle - i
             dut.act_sel_n_i[i].value = sel
-            if m < M and i == stagger:
+            if 0 <= m < M:
                 dut.act_n_i[i].value       = act_matrix[m][i]
                 dut.act_valid_n_i[i].value = 1
             else:
                 dut.act_n_i[i].value       = 0
                 dut.act_valid_n_i[i].value = 0
 
-        # Sample: outputs start appearing at cycle N; at most one col fires per cycle
-        if cycle >= N:
-            for j in range(N):
-                if dut.psum_out_valid_n_o[j].value == 1:
-                    flat.append(int(dut.psum_out_n_o[j].value))
+        # Sample: col j of vector m fires at FallingEdge m + N + j → m = cycle - N - j
+        for j in range(N):
+            if dut.psum_out_valid_n_o[j].value == 1:
+                m = cycle - N - j
+                if 0 <= m < M:
+                    results[m][j] = int(dut.psum_out_n_o[j].value)
 
-    assert len(flat) == M * N, f"expected {M * N} outputs, captured {len(flat)}"
-    results = [flat[r * N:(r + 1) * N] for r in range(M)]
+    for r in range(M):
+        for j in range(N):
+            assert results[r][j] is not None, f"row {r}, col {j}: output not captured"
     for m, row_out in enumerate(results):
         cocotb.log.info(f"  → output row {m}: {row_out}")
     return results
