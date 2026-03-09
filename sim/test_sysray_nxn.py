@@ -20,7 +20,7 @@ def mat_mat_mul_ref(act_matrix, weights):
 
 # Note: the following 2 helper functions independently drive weights and activations with diagonal pipelining, 
 #       however for testing shadow buffering, they have limited usecases as they also drive the valid signals
-#       well. For double buffering, use the load_two_banks and stream_two_matrices functions instead, 
+#       well. For double buffering, use the load_weight_banks and stream_activation_banks functions instead, 
 #       which drive both the data and valid signals in a coordinated way.
 
 async def load_weights(dut, N, weights, sel=0):
