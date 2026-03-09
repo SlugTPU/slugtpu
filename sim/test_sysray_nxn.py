@@ -267,12 +267,23 @@ async def test_shadow_buffer(dut):
       weights0    = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
       weights1    = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
 
-      cocotb.log.info(f"begin testing shadow buffer with N={N}")
+      expected0   = mat_mat_mul_ref(act_matrix0, weights0)
+      expected1  = mat_mat_mul_ref(act_matrix1, weights1)
+
+      cocotb.log.info(f"act_matrix0={act_matrix0}")
+      cocotb.log.info(f"weights0={weights0}")
+      cocotb.log.info(f"expected0={expected0}")
+
+      cocotb.log.info(f"act_matrix1={act_matrix1}")
+      cocotb.log.info(f"weights1={weights1}")
+      cocotb.log.info(f"expected1={expected1}")
 
       cocotb.start_soon(load_two_banks(dut, N, weights0, weights1))                                                                                                
       for _ in range(N):                                                                                                                                             
           await FallingEdge(dut.clk_i)           # bank0 col0 done → stream                                                                                          
       result0, result1 = await stream_two_matrices(dut, N, act_matrix0, act_matrix1)    
+      assert result0 == expected0, f"Matrix 0: expected {expected0}, got {result0}"
+      assert result1 == expected1, f"Matrix 1: expected {expected1}, got {result1}"
 
 # ---------------------------------------------------------------------------
 # Pytest boilerplate
