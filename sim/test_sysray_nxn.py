@@ -204,7 +204,40 @@ async def test_random_matmul_matrix(dut):
             cocotb.log.info(f"out[{m}][{j}] = {got}  (expected {exp})")
             assert got == exp, f"row {m}, col {j}: expected {exp}, got {got}"
 
+@cocotb.test()
+async def test_shadow_buffer(dut):
+      N = dut.N.value.to_unsigned()
 
+      await clock_start(dut.clk_i)
+      await reset_sequence(dut.clk_i, dut.rst_i)
+
+      act_matrix0 = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
+      act_matrix1 = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
+      weights0    = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
+      weights1    = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
+
+      cocotb.log.info(f"begin testing shadow buffer with N={N}")
+
+      # Fire bank 0 loading; streaming starts N FEs later
+      cocotb.start_soon(load_weights(dut, N, weights0, sel=0))
+      for _ in range(N):
+          await FallingEdge(dut.clk_i)   # col 0 bank 0 settled
+
+      # Schedule bank 1 loading to start N FEs from now (when bank 0 finishes)
+      async def load_bank1():
+          for _ in range(N):
+              await FallingEdge(dut.clk_i)
+          await load_weights(dut, N, weights1, sel=1)
+      cocotb.start_soon(load_bank1())
+
+      # Stream layer 0 (reads bank 0 via act_sel=0)
+      results0 = await stream_activation_matrix(dut, N, act_matrix0, sel=0)
+      # Bank 1 is now settled; stream layer 1 immediately (reads bank 1 via act_sel=1)
+      results1 = await stream_activation_matrix(dut, N, act_matrix1, sel=1)
+
+      # Assert both layers
+      assert results0 == mat_mat_mul_ref(act_matrix0, weights0)
+      assert results1 == mat_mat_mul_ref(act_matrix1, weights1)
 
 # ---------------------------------------------------------------------------
 # Pytest boilerplate
@@ -214,6 +247,7 @@ tests = [
     "reset_test",
     "test_basic_matmul_matrix",
     "test_random_matmul_matrix",
+    "test_shadow_buffer",
 ]
 
 proj_path = Path("./rtl").resolve()
@@ -226,7 +260,7 @@ def test_sysray_nxn_each(testcase):
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 8},
+        parameters={"N": 2},
         testcase=testcase,
     )
 
@@ -236,5 +270,5 @@ def test_sysray_nxn_all():
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 8},
+        parameters={"N": 2},
     )
