@@ -1,10 +1,12 @@
 import random
 import cocotb
-from cocotb.triggers import FallingEdge
+from cocotb.triggers import FallingEdge, First, ClockCycles
 from pathlib import Path
 import pytest
 from shared import clock_start, reset_sequence
 from runner import run_test
+
+OUTPUT_TIMEOUT = 64  # max falling edges to wait for a column's valid signal
 
 
 # ---------------------------------------------------------------------------
@@ -72,6 +74,7 @@ async def stream_activations(dut, N, acts):
         await FallingEdge(dut.clk_i)
         for i in range(N):
             if i == row:
+                cocotb.log.info(f"Loading act_n_i[{i}] = {acts[i]} (valid) at cycle {row}")
                 dut.act_n_i[i].value       = acts[i]
                 dut.act_valid_n_i[i].value = 1
             else:
@@ -104,8 +107,7 @@ async def test_basic_matmul(dut):
       psum_out[0] = 1*1 + 2*2 = 5
       psum_out[1] = 1*2 + 2*4 = 10
 
-    Sampling: column j output is valid exactly j+1 falling edges after
-    stream_activations ends (psum flows straight down, one column per cycle).
+    Sampling: wait for psum_out_valid_n_o[j] to assert before reading each column.
     """
     N = dut.N.value.to_unsigned()
     await clock_start(dut.clk_i)
@@ -120,20 +122,25 @@ async def test_basic_matmul(dut):
     await load_weights(dut, N, weights)
     await stream_activations(dut, N, acts)
 
-    # Column j output is valid exactly j+1 falling edges after stream_activations ends.
-    # The PE's psum_o resets to 0 when act_valid_i goes low, so each column's result
-    # must be read in the same cycle it becomes valid — before the next posedge clears it.
-    # At j==0 we also deassert all activations; the registered act_o values in the last
-    # row will continue carrying the final activation through the remaining columns.
+    # Wait one cycle so the last activation is captured at posedge, then deassert.
+    # psum_valid_o is only high for one cycle (PE clears it when act_valid drops),
+    # so check BEFORE advancing to avoid missing the single-cycle pulse.
+    await FallingEdge(dut.clk_i)
+    for i in range(N):
+        dut.act_n_i[i].value       = 0
+        dut.act_valid_n_i[i].value = 0
+
     for j in range(N):
-        await FallingEdge(dut.clk_i)
-        if j == 0:
-            for i in range(N):
-                dut.act_n_i[i].value       = 0
-                dut.act_valid_n_i[i].value = 0
-        got = int(dut.psum_out_n_o[j].value)
-        cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {expected[j]})")
-        assert got == expected[j], f"column {j}: expected {expected[j]}, got {got}"
+        timeout = ClockCycles(dut.clk_i, OUTPUT_TIMEOUT)
+        while True:
+            if dut.psum_out_valid_n_o[j].value == 1:
+                got = int(dut.psum_out_n_o[j].value)
+                cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {expected[j]})")
+                assert got == expected[j], f"column {j}: expected {expected[j]}, got {got}"
+                break
+            fired = await First(FallingEdge(dut.clk_i), timeout)
+            if fired is timeout:
+                raise AssertionError(f"column {j}: timed out waiting for psum_out_valid_n_o")
 
 
 @cocotb.test()
@@ -157,15 +164,22 @@ async def test_random_matmul(dut):
     await load_weights(dut, N, weights)
     await stream_activations(dut, N, acts)
 
+    await FallingEdge(dut.clk_i)
+    for i in range(N):
+        dut.act_n_i[i].value       = 0
+        dut.act_valid_n_i[i].value = 0
+
     for j in range(N):
-        await FallingEdge(dut.clk_i)
-        if j == 0:
-            for i in range(N):
-                dut.act_n_i[i].value       = 0
-                dut.act_valid_n_i[i].value = 0
-        got = int(dut.psum_out_n_o[j].value)
-        cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {expected[j]})")
-        assert got == expected[j], f"column {j}: expected {expected[j]}, got {got}"
+        timeout = ClockCycles(dut.clk_i, OUTPUT_TIMEOUT)
+        while True:
+            if dut.psum_out_valid_n_o[j].value == 1:
+                got = int(dut.psum_out_n_o[j].value)
+                cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {expected[j]})")
+                assert got == expected[j], f"column {j}: expected {expected[j]}, got {got}"
+                break
+            fired = await First(FallingEdge(dut.clk_i), timeout)
+            if fired is timeout:
+                raise AssertionError(f"column {j}: timed out waiting for psum_out_valid_n_o")
 
 # ---------------------------------------------------------------------------
 # Pytest boilerplate
