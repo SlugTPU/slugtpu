@@ -30,11 +30,11 @@ module pe #(
     input  logic                  clk_i,
     input  logic                  rst_i,
 
-    input  logic [DATA_WIDTH:0] act_i, //top bit is select
-    output logic [DATA_WIDTH:0] act_o,
+    input  logic signed [DATA_WIDTH:0] act_i, //top bit is select
+    output logic signed [DATA_WIDTH:0] act_o,
 
-    input  logic [DATA_WIDTH:0] weight_i, //shift reg chain
-    output logic [DATA_WIDTH:0] weight_o,
+    input  logic signed [DATA_WIDTH:0] weight_i, //shift reg chain
+    output logic signed [DATA_WIDTH:0] weight_o,
 
     input  logic weight_valid_i,
     output logic weight_valid_o,
@@ -42,9 +42,9 @@ module pe #(
     input  logic act_valid_i,
     output logic act_valid_o,
 
-    input  logic [ACC_WIDTH-1:0]  psum_i,
+    input  logic signed [ACC_WIDTH-1:0]  psum_i,
     input  logic psum_valid_i,
-    output logic [ACC_WIDTH-1:0]  psum_o,
+    output logic signed [ACC_WIDTH-1:0]  psum_o,
     output  logic psum_valid_o
 );
 
