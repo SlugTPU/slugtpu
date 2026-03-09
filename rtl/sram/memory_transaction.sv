@@ -24,14 +24,23 @@ module memory_transaction #(
 
     logic [counter_width-1:0] current_count_q, transaction_amount_q, current_count_d;
     logic [address_width-1:0] addr_d, addr_q;
-    logic in_use, rw_mode;
+    logic in_use, rw_mode, rw_mode_q;
 
     // assign sram_addr_o = addr_q;
     
-    always_ff @( negedge clk_i ) begin
-        sram_addr_o <= addr_q;
-        sram_rw_mode_o <= rw_mode;
-    end
+    // always_ff @( negedge clk_i ) begin
+    //     sram_addr_o <= addr_q;
+    //     sram_rw_mode_o <= rw_mode;
+    // end
+
+    // //sram_addr_o is the input to the SRAM macro on the A port
+    // always @(addr_q) sram_addr_o = #200 addr_q;
+    // always_ff @( posedge clk_i ) begin
+    //     addr_q <= addr_d;
+    // end
+
+    always @(addr_q) sram_addr_o = #150 addr_q;
+    always @(rw_mode_q) sram_rw_mode_o = #200 rw_mode_q;
 
     assign load_ready_o = ~in_use;
 
@@ -46,11 +55,11 @@ module memory_transaction #(
         end
     end
 
-    // always_comb begin
-    //     sram_rw_mode_o = '0;
-    //     if (in_use & downstream_ready_i )
-    //         sram_rw_mode_o = rw_mode;
-    // end
+    always_comb begin
+        rw_mode_q = '0;
+        if (in_use & downstream_ready_i )
+            rw_mode_q = rw_mode;
+    end
 
     always_ff @( posedge clk_i ) begin
         if(rst_i) begin

@@ -28,7 +28,7 @@ class memory_transaction:
             assert self.dut.downstream_ready_o.value == 1
             self.dut.downstream_ready_i.value = 1
             await FallingEdge(self.dut.clk_i)
-            # assert self.dut.rd_data_o.value == val
+            assert self.dut.rd_data_o.value == val
         self.dut.downstream_ready_i.value = 0
         assert self.dut.load_ready_o.value == 1
         assert self.dut.downstream_ready_o.value == 0
