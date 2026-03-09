@@ -282,6 +282,8 @@ async def test_shadow_buffer(dut):
       for _ in range(N):                                                                                                                                             
           await FallingEdge(dut.clk_i)           # bank0 col0 done → stream                                                                                          
       result0, result1 = await stream_two_matrices(dut, N, act_matrix0, act_matrix1)    
+      cocotb.log.info(f"result0={result0}, expected0={expected0}")
+      cocotb.log.info(f"result1={result1}, expected1={expected1}")
       assert result0 == expected0, f"Matrix 0: expected {expected0}, got {result0}"
       assert result1 == expected1, f"Matrix 1: expected {expected1}, got {result1}"
 
