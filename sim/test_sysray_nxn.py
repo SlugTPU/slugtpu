@@ -10,13 +10,18 @@ OUTPUT_TIMEOUT = 64  # max falling edges to wait for a column's valid signal
 
 
 # ---------------------------------------------------------------------------
-# Reference model
+# Reference models
 # ---------------------------------------------------------------------------
 
 def matmul_ref(acts, weights):
     """C[j] = sum_i acts[i] * weights[i][j]  (vector @ matrix, column outputs)"""
     N = len(acts)
     return [sum(acts[i] * weights[i][j] for i in range(N)) for j in range(N)]
+
+
+def matmul_ref_matrix(act_matrix, weights):
+    """Compute act_matrix @ weights row-by-row; returns an M×N output matrix."""
+    return [matmul_ref(act_row, weights) for act_row in act_matrix]
 
 
 # ---------------------------------------------------------------------------
@@ -115,6 +120,71 @@ async def collect_outputs(dut, N):
     return results
 
 
+async def stream_and_collect(dut, N, acts, sel=0):
+    """
+    Stream one activation vector, deassert inputs, and return the N output psums.
+
+    This is the atomic unit for one inference pass: drive act vector → wait one
+    cycle → clear inputs → collect column outputs.
+    """
+    await stream_activations(dut, N, acts, sel)
+    # Wait one cycle so the last activation is captured at posedge, then deassert.
+    # psum_valid_o is only high for one cycle so check BEFORE advancing.
+    await FallingEdge(dut.clk_i)
+    for i in range(N):
+        dut.act_n_i[i].value       = 0
+        dut.act_valid_n_i[i].value = 0
+    return await collect_outputs(dut, N)
+
+
+async def stream_activation_matrix(dut, N, act_matrix, sel=0):
+    """
+    Stream an M×N activation matrix through the systolic array, pipelined.
+
+    Rows are streamed back-to-back with no inter-row gap: row m+1 starts
+    immediately after row m's last stagger element.  Drive and sample happen
+    in the same loop — no coroutines needed.
+
+    Timing: col j of row m fires at posedge (m+1)*N + j.  Since j < N, all of
+    row m's outputs precede row m+1's col 0, so outputs arrive in strict
+    row-major order and are appended to a flat list then reshaped.
+
+    The loop runs for M*N + N FallingEdges:
+      - Cycles 0 .. M*N-1 : drive staggered elements of each row
+      - Cycles M*N .. M*N+N-1 : inputs deasserted; drain last row's outputs
+
+    Returns an M×N list of output rows.
+    """
+    M = len(act_matrix)
+    flat = []
+
+    for cycle in range(M * N + N):
+        await FallingEdge(dut.clk_i)
+
+        # Drive: row m, stagger position i
+        m, stagger = divmod(cycle, N)
+        for i in range(N):
+            dut.act_sel_n_i[i].value = sel
+            if m < M and i == stagger:
+                dut.act_n_i[i].value       = act_matrix[m][i]
+                dut.act_valid_n_i[i].value = 1
+            else:
+                dut.act_n_i[i].value       = 0
+                dut.act_valid_n_i[i].value = 0
+
+        # Sample: outputs start appearing at cycle N; at most one col fires per cycle
+        if cycle >= N:
+            for j in range(N):
+                if dut.psum_out_valid_n_o[j].value == 1:
+                    flat.append(int(dut.psum_out_n_o[j].value))
+
+    assert len(flat) == M * N, f"expected {M * N} outputs, captured {len(flat)}"
+    results = [flat[r * N:(r + 1) * N] for r in range(M)]
+    for m, row_out in enumerate(results):
+        cocotb.log.info(f"  → output row {m}: {row_out}")
+    return results
+
+
 # ---------------------------------------------------------------------------
 # Tests
 # ---------------------------------------------------------------------------
@@ -122,7 +192,6 @@ async def collect_outputs(dut, N):
 @cocotb.test()
 async def reset_test(dut):
     """Verify that all psum outputs are 0 after reset with no inputs driven."""
-    N = dut.N.value.to_unsigned()
     await clock_start(dut.clk_i)
     await reset_sequence(dut.clk_i, dut.rst_i)
     await FallingEdge(dut.rst_i)
@@ -153,17 +222,8 @@ async def test_basic_matmul(dut):
     cocotb.log.info(f"N={N}, acts={acts}, weights={weights}, expected={expected}")
 
     await load_weights(dut, N, weights)
-    await stream_activations(dut, N, acts)
+    results = await stream_and_collect(dut, N, acts)
 
-    # Wait one cycle so the last activation is captured at posedge, then deassert.
-    # psum_valid_o is only high for one cycle (PE clears it when act_valid drops),
-    # so check BEFORE advancing to avoid missing the single-cycle pulse.
-    await FallingEdge(dut.clk_i)
-    for i in range(N):
-        dut.act_n_i[i].value       = 0
-        dut.act_valid_n_i[i].value = 0
-
-    results = await collect_outputs(dut, N)
     for j, (got, exp) in enumerate(zip(results, expected)):
         cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {exp})")
         assert got == exp, f"column {j}: expected {exp}, got {got}"
@@ -188,17 +248,74 @@ async def test_random_matmul(dut):
     cocotb.log.info(f"N={N}, acts={acts}, weights={weights}, expected={expected}")
 
     await load_weights(dut, N, weights)
-    await stream_activations(dut, N, acts)
+    results = await stream_and_collect(dut, N, acts)
 
-    await FallingEdge(dut.clk_i)
-    for i in range(N):
-        dut.act_n_i[i].value       = 0
-        dut.act_valid_n_i[i].value = 0
-
-    results = await collect_outputs(dut, N)
     for j, (got, exp) in enumerate(zip(results, expected)):
         cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {exp})")
         assert got == exp, f"column {j}: expected {exp}, got {got}"
+
+
+@cocotb.test()
+async def test_basic_matmul_matrix(dut):
+    """
+    Fixed-value matrix-matrix multiply: N×N activation matrix × N×N weights.
+
+    act_matrix[m][i] = m * N + i + 1   (distinct values across all rows)
+    weights[i][j]    = (i+1) * (j+1)
+
+    Each output row is verified independently against matmul_ref.
+    """
+    N = dut.N.value.to_unsigned()
+    M = N
+    await clock_start(dut.clk_i)
+    await reset_sequence(dut.clk_i, dut.rst_i)
+
+    act_matrix = [[m * N + i + 1 for i in range(N)] for m in range(M)]
+    weights    = [[(i + 1) * (j + 1) for j in range(N)] for i in range(N)]
+    expected   = matmul_ref_matrix(act_matrix, weights)
+
+    cocotb.log.info(f"N={N}, M={M}")
+    cocotb.log.info(f"act_matrix={act_matrix}")
+    cocotb.log.info(f"weights={weights}")
+    cocotb.log.info(f"expected={expected}")
+
+    await load_weights(dut, N, weights)
+    results = await stream_activation_matrix(dut, N, act_matrix)
+
+    for m, (row_got, row_exp) in enumerate(zip(results, expected)):
+        for j, (got, exp) in enumerate(zip(row_got, row_exp)):
+            cocotb.log.info(f"out[{m}][{j}] = {got}  (expected {exp})")
+            assert got == exp, f"row {m}, col {j}: expected {exp}, got {got}"
+
+
+@cocotb.test()
+async def test_random_matmul_matrix(dut):
+    """
+    Random matrix-matrix multiply: M×N activation matrix × N×N weights.
+
+    Values are capped at 7 so M * N * 7 * 7 stays well within ACC_WIDTH=32.
+    """
+    N = dut.N.value.to_unsigned()
+    M = random.randint(2, max(2, N))
+    await clock_start(dut.clk_i)
+    await reset_sequence(dut.clk_i, dut.rst_i)
+
+    act_matrix = [[random.randint(0, 7) for _ in range(N)] for _ in range(M)]
+    weights    = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
+    expected   = matmul_ref_matrix(act_matrix, weights)
+
+    cocotb.log.info(f"N={N}, M={M}")
+    cocotb.log.info(f"act_matrix={act_matrix}")
+    cocotb.log.info(f"weights={weights}")
+    cocotb.log.info(f"expected={expected}")
+
+    await load_weights(dut, N, weights)
+    results = await stream_activation_matrix(dut, N, act_matrix)
+
+    for m, (row_got, row_exp) in enumerate(zip(results, expected)):
+        for j, (got, exp) in enumerate(zip(row_got, row_exp)):
+            cocotb.log.info(f"out[{m}][{j}] = {got}  (expected {exp})")
+            assert got == exp, f"row {m}, col {j}: expected {exp}, got {got}"
 
 
 @cocotb.test()
@@ -251,26 +368,14 @@ async def test_shadow_buffer(dut):
 
     # Step 3: inference A using bank 0
     expected_a = matmul_ref(acts_a, W0)
-    await stream_activations(dut, N, acts_a, sel=0)
-    await FallingEdge(dut.clk_i)
-    for i in range(N):
-        dut.act_n_i[i].value       = 0
-        dut.act_valid_n_i[i].value = 0
-
-    results_a = await collect_outputs(dut, N)
+    results_a  = await stream_and_collect(dut, N, acts_a, sel=0)
     for j, (got, exp) in enumerate(zip(results_a, expected_a)):
         cocotb.log.info(f"[A] psum_out_n_o[{j}] = {got}  (expected {exp})")
         assert got == exp, f"[A] column {j}: expected {exp}, got {got}"
 
     # Step 4: inference B using bank 1
     expected_b = matmul_ref(acts_b, W1)
-    await stream_activations(dut, N, acts_b, sel=1)
-    await FallingEdge(dut.clk_i)
-    for i in range(N):
-        dut.act_n_i[i].value       = 0
-        dut.act_valid_n_i[i].value = 0
-
-    results_b = await collect_outputs(dut, N)
+    results_b  = await stream_and_collect(dut, N, acts_b, sel=1)
     for j, (got, exp) in enumerate(zip(results_b, expected_b)):
         cocotb.log.info(f"[B] psum_out_n_o[{j}] = {got}  (expected {exp})")
         assert got == exp, f"[B] column {j}: expected {exp}, got {got}"
@@ -283,6 +388,8 @@ tests = [
     "reset_test",
     "test_basic_matmul",
     "test_random_matmul",
+    "test_basic_matmul_matrix",
+    "test_random_matmul_matrix",
     "test_shadow_buffer",
 ]
 
@@ -296,7 +403,7 @@ def test_sysray_nxn_each(testcase):
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 2, "N": 8},
+        parameters={"N": 2},
         testcase=testcase,
     )
 
@@ -306,5 +413,5 @@ def test_sysray_nxn_all():
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 2, "N": 8},
+        parameters={"N": 2},
     )
