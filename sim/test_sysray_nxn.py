@@ -7,10 +7,6 @@ from shared import clock_start, reset_sequence
 from runner import run_test
 
 
-# ---------------------------------------------------------------------------
-# Reference models
-# ---------------------------------------------------------------------------
-
 def vec_mat_mul_ref(acts, weights):
     """C[j] = sum_i acts[i] * weights[i][j]  (vector @ matrix, column outputs)"""
     N = len(acts)
@@ -21,10 +17,6 @@ def mat_mat_mul_ref(act_matrix, weights):
     """Compute act_matrix @ weights row-by-row; returns an M×N output matrix."""
     return [vec_mat_mul_ref(act_row, weights) for act_row in act_matrix]
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
 
 
 async def load_weights(dut, N, weights, sel=0):
@@ -67,7 +59,6 @@ async def load_weights(dut, N, weights, sel=0):
     for col in range(N):
         dut.weight_n_i[col].value       = 0
         dut.weight_valid_n_i[col].value = 0
-
 
 
 
@@ -177,10 +168,6 @@ async def stream_two_matrices(dut, N, mat0, mat1):
 
     return results0, results1 
 
-
-# ---------------------------------------------------------------------------
-# Tests
-# ---------------------------------------------------------------------------
 
 @cocotb.test()
 async def reset_test(dut):
