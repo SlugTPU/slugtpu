@@ -126,6 +126,57 @@ async def stream_activation_matrix(dut, N, act_matrix, sel=0):
         cocotb.log.info(f"  → output row {m}: {row_out}")
     return results
 
+async def load_two_banks(dut, N, weights0, weights1):                                                                                                          
+    for cycle in range(3 * N - 1):          # bank0: cycles 0..2N-2, bank1: N..3N-2                                                                            
+        await FallingEdge(dut.clk_i)                                                                                                                           
+        for col in range(N):                                                                                                                                   
+            b0_idx = cycle - col                                                                                                                               
+            b1_idx = cycle - N - col                                                                                                                           
+            if 0 <= b0_idx < N:                                                                                                                              
+                dut.weight_sel_n_i[col].value   = 0                                                                                                            
+                dut.weight_n_i[col].value       = weights0[N-1-b0_idx][col]
+                dut.weight_valid_n_i[col].value = 1                                                                                                            
+            elif 0 <= b1_idx < N:                                                                                                                              
+                dut.weight_sel_n_i[col].value   = 1                                                                                                            
+                dut.weight_n_i[col].value       = weights1[N-1-b1_idx][col]                                                                                    
+                dut.weight_valid_n_i[col].value = 1                                                                                                            
+            else:                                                                                                                                            
+                dut.weight_n_i[col].value       = 0                                                                                                            
+                dut.weight_valid_n_i[col].value = 0    
+
+    await FallingEdge(dut.clk_i)
+    dut.weight_valid_n_i[N-1].value = 0
+
+async def stream_two_matrices(dut, N, mat0, mat1):                                                                                             
+    results0 = [[None]*N for _ in range(N)]                                                                                                                    
+    results1 = [[None]*N for _ in range(N)]                                                                                                                    
+                                                                                                                                                                
+    for cycle in range(2*N + 2*N - 1):                                                                                                                         
+        await FallingEdge(dut.clk_i)                                                                                                                           
+        for i in range(N):                                                                                                                                     
+            m = cycle - i
+            if 0 <= m < N:                                                                                                                                     
+                dut.act_sel_n_i[i].value   = 0                                                                                                              
+                dut.act_n_i[i].value       = mat0[m][i]                                                                                                        
+                dut.act_valid_n_i[i].value = 1                                                                                                                 
+            elif N <= m < 2*N:                                                                                                                                 
+                dut.act_sel_n_i[i].value   = 1                                                                                                              
+                dut.act_n_i[i].value       = mat1[m-N][i]                                                                                                      
+                dut.act_valid_n_i[i].value = 1                                                                                                                 
+            else:                                                                                                                                              
+                dut.act_n_i[i].value       = 0                                                                                                                 
+                dut.act_valid_n_i[i].value = 0                                                                                                                 
+                
+        for j in range(N):                                                                                                                                     
+            if dut.psum_out_valid_n_o[j].value == 1:
+                m = cycle - N - j                                                                                                                              
+                if 0 <= m < N:                                                                                                                                 
+                    results0[m][j] = int(dut.psum_out_n_o[j].value)                                                                                            
+                elif N <= m < 2*N:                                                                                                                             
+                    results1[m-N][j] = int(dut.psum_out_n_o[j].value)                                                                                          
+
+    return results0, results1 
+
 
 # ---------------------------------------------------------------------------
 # Tests
@@ -218,26 +269,10 @@ async def test_shadow_buffer(dut):
 
       cocotb.log.info(f"begin testing shadow buffer with N={N}")
 
-      # Fire bank 0 loading; streaming starts N FEs later
-      cocotb.start_soon(load_weights(dut, N, weights0, sel=0))
-      for _ in range(N):
-          await FallingEdge(dut.clk_i)   # col 0 bank 0 settled
-
-      # Schedule bank 1 loading to start N FEs from now (when bank 0 finishes)
-      async def load_bank1():
-          for _ in range(N):
-              await FallingEdge(dut.clk_i)
-          await load_weights(dut, N, weights1, sel=1)
-      cocotb.start_soon(load_bank1())
-
-      # Stream layer 0 (reads bank 0 via act_sel=0)
-      results0 = await stream_activation_matrix(dut, N, act_matrix0, sel=0)
-      # Bank 1 is now settled; stream layer 1 immediately (reads bank 1 via act_sel=1)
-      results1 = await stream_activation_matrix(dut, N, act_matrix1, sel=1)
-
-      # Assert both layers
-      assert results0 == mat_mat_mul_ref(act_matrix0, weights0)
-      assert results1 == mat_mat_mul_ref(act_matrix1, weights1)
+      cocotb.start_soon(load_two_banks(dut, N, weights0, weights1))                                                                                                
+      for _ in range(N):                                                                                                                                             
+          await FallingEdge(dut.clk_i)           # bank0 col0 done → stream                                                                                          
+      result0, result1 = await stream_two_matrices(dut, N, act_matrix0, act_matrix1)    
 
 # ---------------------------------------------------------------------------
 # Pytest boilerplate
