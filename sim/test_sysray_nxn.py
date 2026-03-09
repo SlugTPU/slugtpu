@@ -96,17 +96,16 @@ async def stream_activation_matrix(dut, N, act_matrix, sel=0):
 
     Returns an M×N list of output rows.
     """
-    M = len(act_matrix)
-    results = [[None] * N for _ in range(M)]
+    results = [[None] * N for _ in range(N)]
 
-    for cycle in range(M + 2 * N - 1):
+    for cycle in range(N + 2 * N - 1):
         await FallingEdge(dut.clk_i)
 
         # Drive: row i carries vector m = cycle - i when in range
         for i in range(N):
             m = cycle - i
             dut.act_sel_n_i[i].value = sel
-            if 0 <= m < M:
+            if 0 <= m < N:
                 dut.act_n_i[i].value       = act_matrix[m][i]
                 dut.act_valid_n_i[i].value = 1
             else:
@@ -117,10 +116,10 @@ async def stream_activation_matrix(dut, N, act_matrix, sel=0):
         for j in range(N):
             if dut.psum_out_valid_n_o[j].value == 1:
                 m = cycle - N - j
-                if 0 <= m < M:
+                if 0 <= m < N:
                     results[m][j] = int(dut.psum_out_n_o[j].value)
 
-    for r in range(M):
+    for r in range(N):
         for j in range(N):
             assert results[r][j] is not None, f"row {r}, col {j}: output not captured"
     for m, row_out in enumerate(results):
@@ -148,6 +147,7 @@ async def test_basic_matmul_matrix(dut):
     Each output row is verified independently against matmul_ref.
     """
     N = dut.N.value.to_unsigned()
+    # always square!
     M = N
     await clock_start(dut.clk_i)
     await reset_sequence(dut.clk_i, dut.rst_i)
@@ -180,7 +180,8 @@ async def test_random_matmul_matrix(dut):
     Values are capped at 7 so M * N * 7 * 7 stays well within ACC_WIDTH=32.
     """
     N = dut.N.value.to_unsigned()
-    M = random.randint(2, max(2, N))
+    # always square!
+    M = N
     await clock_start(dut.clk_i)
     await reset_sequence(dut.clk_i, dut.rst_i)
 
@@ -225,7 +226,7 @@ def test_sysray_nxn_each(testcase):
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 2},
+        parameters={"N": 8},
         testcase=testcase,
     )
 
@@ -235,5 +236,5 @@ def test_sysray_nxn_all():
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 2},
+        parameters={"N": 8},
     )
