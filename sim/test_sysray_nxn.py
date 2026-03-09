@@ -13,15 +13,15 @@ OUTPUT_TIMEOUT = 64  # max falling edges to wait for a column's valid signal
 # Reference models
 # ---------------------------------------------------------------------------
 
-def matmul_ref(acts, weights):
+def vec_mat_mul_ref(acts, weights):
     """C[j] = sum_i acts[i] * weights[i][j]  (vector @ matrix, column outputs)"""
     N = len(acts)
     return [sum(acts[i] * weights[i][j] for i in range(N)) for j in range(N)]
 
 
-def matmul_ref_matrix(act_matrix, weights):
+def mat_mat_mul_ref(act_matrix, weights):
     """Compute act_matrix @ weights row-by-row; returns an M×N output matrix."""
-    return [matmul_ref(act_row, weights) for act_row in act_matrix]
+    return [vec_mat_mul_ref(act_row, weights) for act_row in act_matrix]
 
 
 # ---------------------------------------------------------------------------
@@ -207,70 +207,9 @@ async def reset_test(dut):
 
 
 @cocotb.test()
-async def test_basic_matmul(dut):
-    """
-    Fixed-value vector-matrix multiply for manual verification.
-
-    acts[i]        = i + 1              e.g. [1, 2] for N=2
-    weights[i][j]  = (i+1) * (j+1)     e.g. [[1,2],[2,4]] for N=2
-
-    Expected output for N=2:
-      psum_out[0] = 1*1 + 2*2 = 5
-      psum_out[1] = 1*2 + 2*4 = 10
-
-    Sampling: wait for psum_out_valid_n_o[j] to assert before reading each column.
-    """
-    N = dut.N.value.to_unsigned()
-    await clock_start(dut.clk_i)
-    await reset_sequence(dut.clk_i, dut.rst_i)
-
-    acts    = list(range(1, N + 1))
-    weights = [[(i + 1) * (j + 1) for j in range(N)] for i in range(N)]
-    expected = matmul_ref(acts, weights)
-
-    cocotb.log.info(f"N={N}, acts={acts}, weights={weights}, expected={expected}")
-
-    await load_weights(dut, N, weights)
-    results = await stream_and_collect(dut, N, acts)
-
-    for j, (got, exp) in enumerate(zip(results, expected)):
-        cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {exp})")
-        assert got == exp, f"column {j}: expected {exp}, got {got}"
-
-
-@cocotb.test()
-async def test_random_matmul(dut):
-    """
-    Random vector-matrix multiply.
-
-    Values are capped at 15 so N * 15 * 15 = 225*N stays well within
-    the 32-bit accumulator (ACC_WIDTH=32).
-    """
-    N = dut.N.value.to_unsigned()
-    await clock_start(dut.clk_i)
-    await reset_sequence(dut.clk_i, dut.rst_i)
-
-    acts    = [random.randint(0, 15) for _ in range(N)]
-    weights = [[random.randint(0, 15) for _ in range(N)] for _ in range(N)]
-    expected = matmul_ref(acts, weights)
-
-    cocotb.log.info(f"N={N}, acts={acts}, weights={weights}, expected={expected}")
-
-    await load_weights(dut, N, weights)
-    results = await stream_and_collect(dut, N, acts)
-
-    for j, (got, exp) in enumerate(zip(results, expected)):
-        cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {exp})")
-        assert got == exp, f"column {j}: expected {exp}, got {got}"
-
-
-@cocotb.test()
 async def test_basic_matmul_matrix(dut):
     """
     Fixed-value matrix-matrix multiply: N×N activation matrix × N×N weights.
-
-    act_matrix[m][i] = m * N + i + 1   (distinct values across all rows)
-    weights[i][j]    = (i+1) * (j+1)
 
     Each output row is verified independently against matmul_ref.
     """
@@ -281,7 +220,7 @@ async def test_basic_matmul_matrix(dut):
 
     act_matrix = [[m * N + i + 1 for i in range(N)] for m in range(M)]
     weights    = [[(i + 1) * (j + 1) for j in range(N)] for i in range(N)]
-    expected   = matmul_ref_matrix(act_matrix, weights)
+    expected   = mat_mat_mul_ref(act_matrix, weights)
 
     cocotb.log.info(f"N={N}, M={M}")
     cocotb.log.info(f"act_matrix={act_matrix}")
@@ -311,7 +250,7 @@ async def test_random_matmul_matrix(dut):
 
     act_matrix = [[random.randint(0, 7) for _ in range(N)] for _ in range(M)]
     weights    = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
-    expected   = matmul_ref_matrix(act_matrix, weights)
+    expected   = mat_mat_mul_ref(act_matrix, weights)
 
     cocotb.log.info(f"N={N}, M={M}")
     cocotb.log.info(f"act_matrix={act_matrix}")
@@ -376,14 +315,14 @@ async def test_shadow_buffer(dut):
     await load_weights(dut, N, W1, sel=1)
 
     # Step 3: inference A using bank 0
-    expected_a = matmul_ref(acts_a, W0)
+    expected_a = vec_mat_mul_ref(acts_a, W0)
     results_a  = await stream_and_collect(dut, N, acts_a, sel=0)
     for j, (got, exp) in enumerate(zip(results_a, expected_a)):
         cocotb.log.info(f"[A] psum_out_n_o[{j}] = {got}  (expected {exp})")
         assert got == exp, f"[A] column {j}: expected {exp}, got {got}"
 
     # Step 4: inference B using bank 1
-    expected_b = matmul_ref(acts_b, W1)
+    expected_b = vec_mat_mul_ref(acts_b, W1)
     results_b  = await stream_and_collect(dut, N, acts_b, sel=1)
     for j, (got, exp) in enumerate(zip(results_b, expected_b)):
         cocotb.log.info(f"[B] psum_out_n_o[{j}] = {got}  (expected {exp})")
@@ -395,8 +334,6 @@ async def test_shadow_buffer(dut):
 
 tests = [
     "reset_test",
-    "test_basic_matmul",
-    "test_random_matmul",
     "test_basic_matmul_matrix",
     "test_random_matmul_matrix",
     "test_shadow_buffer",
