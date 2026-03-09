@@ -19,11 +19,11 @@ module sysray_nxn #(
 
   input logic                    act_valid_n_i         [N-1:0],
   input logic  [DATA_WIDTH-1:0]  act_n_i               [N-1:0],
-  input logic                    act_sel_i,
+  input logic                    act_sel_n_i           [N-1:0],  // one select bit per row
 
   input logic                    weight_valid_n_i      [N-1:0],
   input logic  [DATA_WIDTH-1:0]  weight_n_i            [N-1:0],
-  input logic                    weight_sel_i,
+  input logic                    weight_sel_n_i        [N-1:0],  // one select bit per column
 
   input logic                    psum_valid_n_i        [N-1:0],
   input logic  [ACC_WIDTH-1:0]   psum_n_i              [N-1:0],
@@ -46,7 +46,7 @@ generate
   for (i = 0 ; i < N; i++) begin  : row_block
     for (j = 0; j < N; j++) begin : col_block
       if (i == 0) begin
-        assign w_conn[i][j] = {weight_sel_i, weight_n_i[j]};
+        assign w_conn[i][j] = {weight_sel_n_i[j], weight_n_i[j]};
         assign w_valid_conn[i][j] = weight_valid_n_i[j];
         assign psum_conn[i][j] = '0;
         assign psum_valid_conn[i][j] = 1'b1;
@@ -55,7 +55,7 @@ generate
         assign psum_out_valid_n_o[j] = psum_valid_conn[i+1][j];
       end
       if (j == 0) begin
-        assign a_conn[i][j] = {act_sel_i, act_n_i[i]};
+        assign a_conn[i][j] = {act_sel_n_i[i], act_n_i[i]};
         assign a_valid_conn[i][j] = act_valid_n_i[i];
       end
 
