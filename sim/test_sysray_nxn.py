@@ -29,46 +29,44 @@ def mat_mat_mul_ref(act_matrix, weights):
 
 async def load_weights(dut, N, weights, sel=0):
     """
-    Load weights into the systolic array over N falling-edge-aligned cycles.
+    Load weights into the systolic array with a diagonal column stagger.
 
-    Feed bottom row first so that after N posedges, PE[i][j] holds weights[i][j].
+    Column j starts its row sweep j cycles after column 0, mirroring the
+    diagonal wavefront used by stream_activation_matrix.  At each cycle c,
+    column j is active when 0 <= c - j < N and receives weights[N-1-(c-j)][j]
+    (bottom-to-top sweep, same as before).
 
-    Why bottom-to-top: weights propagate downward one register per cycle via
-    weight_o = weight_buf[prev_sel].  Feeding row N-1 first lets it ripple down
-    while subsequent rows fill in above it:
+    Drive schedule (N=2 example):
+      cycle 0: col0 = w[1][0]
+      cycle 1: col0 = w[0][0],  col1 = w[1][1]   ← two columns active
+      cycle 2:                   col1 = w[0][1]
 
-      Cycle -N:   weight_n_i[j] = weights[N-1][j]  -> latched into PE[0][j]
-      Cycle -N+1: weight_n_i[j] = weights[N-2][j]  -> PE[0][j] updated,
-                                                        PE[1][j] captures weights[N-1][j]
-      ...
-      Cycle -1:   weight_n_i[j] = weights[0][j]    -> PE[0][j] = weights[0][j],
-                                                        ..., PE[N-1][j] = weights[N-1][j]
+    Total drive cycles: 2*N - 1.  After the sweep, one deassert cycle clears
+    weight_valid for all columns.
 
-    All columns are loaded simultaneously (no column stagger required for
-    the weight-loading phase without double-buffering).
-
-    sel: 0 or 1 — selects which PE weight bank receives the data (weight_sel_n_i[j]).
-    All columns use the same bank for a given load; the array port is per-column to
-    match the per-signal embedding of the select bit in the PE interface.
-
-    weight_sel_n_i is driven at the same falling edge as the first valid weight, not
-    before the loop.  A gap posedge with weight_sel toggled but weight_valid=0 would
-    unconditionally update prev_weight_sel in every PE (the update is not gated on
-    weight_valid_i), causing weight_o to switch to the still-empty new bank and
-    corrupt a downstream PE's weight_buf on the very next valid cycle.
+    sel: 0 or 1 — selects which PE weight bank receives the data.
+    weight_sel_n_i is driven atomically with the first valid weight for each
+    column; driving it before valid would toggle prev_weight_sel in every PE
+    and corrupt the downstream weight_buf.
     """
-    for row in range(N - 1, -1, -1):   # N-1 down to 0
+    for cycle in range(2 * N - 1):
         await FallingEdge(dut.clk_i)
         for col in range(N):
-            dut.weight_sel_n_i[col].value    = sel   # change sel atomically with data/valid
-            dut.weight_n_i[col].value        = weights[row][col]
-            dut.weight_valid_n_i[col].value  = 1
+            row_idx = cycle - col          # position in the bottom-to-top sweep
+            if 0 <= row_idx < N:
+                row = N - 1 - row_idx      # row_idx=0 → bottom row (N-1)
+                dut.weight_sel_n_i[col].value   = sel
+                dut.weight_n_i[col].value       = weights[row][col]
+                dut.weight_valid_n_i[col].value = 1
+            else:
+                dut.weight_n_i[col].value       = 0
+                dut.weight_valid_n_i[col].value = 0
 
-    # Deassert weight_valid one cycle after the last row is presented
+    # Deassert weight_valid one cycle after the last column finishes
     await FallingEdge(dut.clk_i)
     for col in range(N):
-        dut.weight_n_i[col].value        = 0
-        dut.weight_valid_n_i[col].value  = 0
+        dut.weight_n_i[col].value       = 0
+        dut.weight_valid_n_i[col].value = 0
 
 
 
