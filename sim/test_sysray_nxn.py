@@ -274,10 +274,6 @@ async def test_shadow_buffer(dut):
       assert result0 == expected0, f"Matrix 0: expected {expected0}, got {result0}"
       assert result1 == expected1, f"Matrix 1: expected {expected1}, got {result1}"
 
-# ---------------------------------------------------------------------------
-# Pytest boilerplate
-# ---------------------------------------------------------------------------
-
 tests = [
     "reset_test",
     "test_basic_matmul_matrix",
