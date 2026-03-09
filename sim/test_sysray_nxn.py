@@ -24,7 +24,7 @@ def matmul_ref(acts, weights):
 # ---------------------------------------------------------------------------
 
 
-async def load_weights(dut, N, weights):
+async def load_weights(dut, N, weights, sel=0):
     """
     Load weights into the systolic array over N falling-edge-aligned cycles.
 
@@ -43,10 +43,21 @@ async def load_weights(dut, N, weights):
 
     All columns are loaded simultaneously (no column stagger required for
     the weight-loading phase without double-buffering).
+
+    sel: 0 or 1 — selects which PE weight bank receives the data (weight_sel_n_i[j]).
+    All columns use the same bank for a given load; the array port is per-column to
+    match the per-signal embedding of the select bit in the PE interface.
+
+    weight_sel_n_i is driven at the same falling edge as the first valid weight, not
+    before the loop.  A gap posedge with weight_sel toggled but weight_valid=0 would
+    unconditionally update prev_weight_sel in every PE (the update is not gated on
+    weight_valid_i), causing weight_o to switch to the still-empty new bank and
+    corrupt a downstream PE's weight_buf on the very next valid cycle.
     """
     for row in range(N - 1, -1, -1):   # N-1 down to 0
         await FallingEdge(dut.clk_i)
         for col in range(N):
+            dut.weight_sel_n_i[col].value    = sel   # change sel atomically with data/valid
             dut.weight_n_i[col].value        = weights[row][col]
             dut.weight_valid_n_i[col].value  = 1
 
@@ -57,7 +68,7 @@ async def load_weights(dut, N, weights):
         dut.weight_valid_n_i[col].value  = 0
 
 
-async def stream_activations(dut, N, acts):
+async def stream_activations(dut, N, acts, sel=0):
     """
     Drive one activation vector with proper row staggering.
 
@@ -69,10 +80,14 @@ async def stream_activations(dut, N, acts):
       Cycle 1:   act_n_i[1] = acts[1], valid[1] = 1;  rows 0,2..N-1 idle
       ...
       Cycle N-1: act_n_i[N-1] = acts[N-1], valid[N-1] = 1;  all others idle
+
+    sel: 0 or 1 — selects which PE weight bank the MAC reads from (act_sel_n_i[i]).
+    All rows use the same bank for a given inference pass.
     """
     for row in range(N):
         await FallingEdge(dut.clk_i)
         for i in range(N):
+            dut.act_sel_n_i[i].value = sel
             if i == row:
                 cocotb.log.info(f"Loading act_n_i[{i}] = {acts[i]} (valid) at cycle {row}")
                 dut.act_n_i[i].value       = acts[i]
@@ -80,6 +95,24 @@ async def stream_activations(dut, N, acts):
             else:
                 dut.act_n_i[i].value       = 0
                 dut.act_valid_n_i[i].value = 0
+
+
+async def collect_outputs(dut, N):
+    """
+    Wait for psum_out_valid_n_o to assert on every column and return the values.
+    Raises AssertionError on timeout.
+    """
+    results = []
+    for j in range(N):
+        timeout = ClockCycles(dut.clk_i, OUTPUT_TIMEOUT)
+        while True:
+            if dut.psum_out_valid_n_o[j].value == 1:
+                results.append(int(dut.psum_out_n_o[j].value))
+                break
+            fired = await First(FallingEdge(dut.clk_i), timeout)
+            if fired is timeout:
+                raise AssertionError(f"column {j}: timed out waiting for psum_out_valid_n_o")
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -130,17 +163,10 @@ async def test_basic_matmul(dut):
         dut.act_n_i[i].value       = 0
         dut.act_valid_n_i[i].value = 0
 
-    for j in range(N):
-        timeout = ClockCycles(dut.clk_i, OUTPUT_TIMEOUT)
-        while True:
-            if dut.psum_out_valid_n_o[j].value == 1:
-                got = int(dut.psum_out_n_o[j].value)
-                cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {expected[j]})")
-                assert got == expected[j], f"column {j}: expected {expected[j]}, got {got}"
-                break
-            fired = await First(FallingEdge(dut.clk_i), timeout)
-            if fired is timeout:
-                raise AssertionError(f"column {j}: timed out waiting for psum_out_valid_n_o")
+    results = await collect_outputs(dut, N)
+    for j, (got, exp) in enumerate(zip(results, expected)):
+        cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {exp})")
+        assert got == exp, f"column {j}: expected {exp}, got {got}"
 
 
 @cocotb.test()
@@ -169,17 +195,73 @@ async def test_random_matmul(dut):
         dut.act_n_i[i].value       = 0
         dut.act_valid_n_i[i].value = 0
 
-    for j in range(N):
-        timeout = ClockCycles(dut.clk_i, OUTPUT_TIMEOUT)
-        while True:
-            if dut.psum_out_valid_n_o[j].value == 1:
-                got = int(dut.psum_out_n_o[j].value)
-                cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {expected[j]})")
-                assert got == expected[j], f"column {j}: expected {expected[j]}, got {got}"
-                break
-            fired = await First(FallingEdge(dut.clk_i), timeout)
-            if fired is timeout:
-                raise AssertionError(f"column {j}: timed out waiting for psum_out_valid_n_o")
+    results = await collect_outputs(dut, N)
+    for j, (got, exp) in enumerate(zip(results, expected)):
+        cocotb.log.info(f"psum_out_n_o[{j}] = {got}  (expected {exp})")
+        assert got == exp, f"column {j}: expected {exp}, got {got}"
+
+
+@cocotb.test()
+async def test_shadow_buffer(dut):
+    """
+    Shadow-buffer (double-buffering) test: preload two weight sets into opposite
+    banks, then run two back-to-back inferences by toggling act_sel_i / weight_sel_i.
+
+    Sequence:
+      1. Load W0 into bank 0 (weight_sel_i=0).
+      2. Load W1 into bank 1 (weight_sel_i=1) — shadow bank, loaded without
+         disturbing bank 0.
+      3. Inference A: stream acts with act_sel_i=0  →  MAC reads weight_buf[0]=W0.
+         Verify outputs match matmul(acts_a, W0).
+      4. Inference B: stream acts with act_sel_i=1  →  MAC reads weight_buf[1]=W1.
+         Verify outputs match matmul(acts_b, W1).
+
+    This confirms that the PE's two weight banks are independently addressable and
+    that flipping act_sel_i atomically switches the active weight set.
+    """
+    N = dut.N.value.to_unsigned()
+    await clock_start(dut.clk_i)
+    await reset_sequence(dut.clk_i, dut.rst_i)
+
+    acts_a = [random.randint(1, 15) for _ in range(N)]
+    acts_b = [random.randint(1, 15) for _ in range(N)]
+    W0     = [[random.randint(1, 15) for _ in range(N)] for _ in range(N)]
+    W1     = [[random.randint(1, 15) for _ in range(N)] for _ in range(N)]
+
+    cocotb.log.info(f"N={N}")
+    cocotb.log.info(f"W0={W0}, W1={W1}")
+    cocotb.log.info(f"acts_a={acts_a}, acts_b={acts_b}")
+
+    # Step 1: load W0 into bank 0
+    await load_weights(dut, N, W0, sel=0)
+    # Step 2: load W1 into bank 1 (shadow bank — bank 0 remains intact)
+    await load_weights(dut, N, W1, sel=1)
+
+    # Step 3: inference A using bank 0
+    expected_a = matmul_ref(acts_a, W0)
+    await stream_activations(dut, N, acts_a, sel=0)
+    await FallingEdge(dut.clk_i)
+    for i in range(N):
+        dut.act_n_i[i].value       = 0
+        dut.act_valid_n_i[i].value = 0
+
+    results_a = await collect_outputs(dut, N)
+    for j, (got, exp) in enumerate(zip(results_a, expected_a)):
+        cocotb.log.info(f"[A] psum_out_n_o[{j}] = {got}  (expected {exp})")
+        assert got == exp, f"[A] column {j}: expected {exp}, got {got}"
+
+    # Step 4: inference B using bank 1
+    expected_b = matmul_ref(acts_b, W1)
+    await stream_activations(dut, N, acts_b, sel=1)
+    await FallingEdge(dut.clk_i)
+    for i in range(N):
+        dut.act_n_i[i].value       = 0
+        dut.act_valid_n_i[i].value = 0
+
+    results_b = await collect_outputs(dut, N)
+    for j, (got, exp) in enumerate(zip(results_b, expected_b)):
+        cocotb.log.info(f"[B] psum_out_n_o[{j}] = {got}  (expected {exp})")
+        assert got == exp, f"[B] column {j}: expected {exp}, got {got}"
 
 # ---------------------------------------------------------------------------
 # Pytest boilerplate
@@ -189,6 +271,7 @@ tests = [
     "reset_test",
     "test_basic_matmul",
     "test_random_matmul",
+    "test_shadow_buffer",
 ]
 
 proj_path = Path("./rtl").resolve()
