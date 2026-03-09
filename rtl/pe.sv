@@ -80,15 +80,17 @@ module pe #(
     end
 
     // MAC reads from the bank selected by the activation stream
-    logic [DATA_WIDTH-1:0] active_weight;
+    logic signed [DATA_WIDTH-1:0]   active_weight;
+    logic signed [ACC_WIDTH-1:0]    s_product;
     assign active_weight = weight_buf[act_sel][DATA_WIDTH-1:0];
+    assign s_product     = $signed(act_i[DATA_WIDTH-1:0]) * active_weight;  // 8b signed × 8b signed, sign-extended to 32b
 
     always_ff @(posedge clk_i) begin
         if (rst_i) begin
             psum_o <= '0;
             psum_valid_o <= 1'b0;
         end else if (act_valid_i & psum_valid_i) begin // only update psum if both inputs are valid
-            psum_o <=  (psum_i[ACC_WIDTH-1:0] + (act_i[DATA_WIDTH-1:0] * active_weight));
+            psum_o <= $signed(psum_i) + ACC_WIDTH'(s_product);
             psum_valid_o <= 1'b1;
         end else begin
             psum_o <= '0;
