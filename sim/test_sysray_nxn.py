@@ -228,9 +228,21 @@ async def test_shadow_buffer(dut):
     W0     = [[random.randint(1, 15) for _ in range(N)] for _ in range(N)]
     W1     = [[random.randint(1, 15) for _ in range(N)] for _ in range(N)]
 
-    cocotb.log.info(f"N={N}")
-    cocotb.log.info(f"W0={W0}, W1={W1}")
-    cocotb.log.info(f"acts_a={acts_a}, acts_b={acts_b}")
+    def log_diagram(acts, W, label):
+        # column width wide enough for the largest value
+        cw    = max(len(str(max(max(r) for r in W))), len(str(max(acts)))) + 1
+        aw    = cw  # activation field width matches
+        sep   = "  " + " " * (aw + 5) + "+" + ("-" * (cw + 1) + "+") * N
+        arrow = "-" * 3 + ">"
+        cocotb.log.info(f"  --- {label}: acts (rows) @ W (cols) ---")
+        cocotb.log.info(sep)
+        for i in range(N):
+            cells = "".join(f" {W[i][j]:{cw}}|" for j in range(N))
+            cocotb.log.info(f"  act[{i}]={acts[i]:{aw}} {arrow} |{cells}")
+        cocotb.log.info(sep)
+
+    log_diagram(acts_a, W0, "[A] bank-0")
+    log_diagram(acts_b, W1, "[B] bank-1")
 
     # Step 1: load W0 into bank 0
     await load_weights(dut, N, W0, sel=0)
