@@ -83,8 +83,9 @@ async def stream_activation_matrix(dut, N, act_matrix, sel=0):
         cocotb.log.info(f"  → output row {m}: {row_out}")
     return results
 
-async def load_two_banks(dut, N, weights0, weights1):                                                                                                          
-    for cycle in range(3 * N - 1):          # bank0: cycles 0..2N-2, bank1: N..3N-2                                                                            
+async def load_two_weights(dut, N, weights0, weights1):                                                                                                          
+    # bank0: cycles 0..2N-2, bank1: N..3N-2, bank3: 2N..4N-2
+    for cycle in range(3 * N - 1):          
         await FallingEdge(dut.clk_i)                                                                                                                           
         for col in range(N):                                                                                                                                   
             b0_idx = cycle - col                                                                                                                               
@@ -104,7 +105,7 @@ async def load_two_banks(dut, N, weights0, weights1):
     await FallingEdge(dut.clk_i)
     dut.weight_valid_n_i[N-1].value = 0
 
-async def stream_two_matrices(dut, N, mat0, mat1):                                                                                             
+async def stream_two_activations(dut, N, mat0, mat1):                                                                                             
     results0 = [[None]*N for _ in range(N)]                                                                                                                    
     results1 = [[None]*N for _ in range(N)]                                                                                                                    
                                                                                                                                                                 
@@ -235,10 +236,10 @@ async def test_shadow_buffer(dut):
     cocotb.log.info(f"weights1={weights1}")
     cocotb.log.info(f"expected1={expected1}")
 
-    cocotb.start_soon(load_two_banks(dut, N, weights0, weights1))                                                                                                
+    cocotb.start_soon(load_two_weights(dut, N, weights0, weights1))                                                                                                
     for _ in range(N):                                                                                                                                             
         await FallingEdge(dut.clk_i)           # bank0 col0 done → stream                                                                                          
-    result0, result1 = await stream_two_matrices(dut, N, act_matrix0, act_matrix1)    
+    result0, result1 = await stream_two_activations(dut, N, act_matrix0, act_matrix1)    
     cocotb.log.info(f"result0={result0}, expected0={expected0}")
     cocotb.log.info(f"result1={result1}, expected1={expected1}")
     for m in range(N):
