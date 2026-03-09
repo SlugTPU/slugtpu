@@ -18,17 +18,17 @@ module sysray_nxn #(
   input logic rst_i,
 
   input logic                    act_valid_n_i         [N-1:0],
-  input logic  [DATA_WIDTH-1:0]  act_n_i               [N-1:0],
+  input logic  signed [DATA_WIDTH-1:0]  act_n_i               [N-1:0],
   input logic                    act_sel_n_i           [N-1:0],  // one select bit per row
 
   input logic                    weight_valid_n_i      [N-1:0],
-  input logic  [DATA_WIDTH-1:0]  weight_n_i            [N-1:0],
+  input logic  signed [DATA_WIDTH-1:0]  weight_n_i            [N-1:0],
   input logic                    weight_sel_n_i        [N-1:0],  // one select bit per column
 
   input logic                    psum_valid_n_i        [N-1:0],
-  input logic  [ACC_WIDTH-1:0]   psum_n_i              [N-1:0],
+  input logic  signed [ACC_WIDTH-1:0]   psum_n_i              [N-1:0],
 
-  output logic [ACC_WIDTH-1:0]   psum_out_n_o          [N-1:0],
+  output logic signed [ACC_WIDTH-1:0]   psum_out_n_o          [N-1:0],
   output logic                   psum_out_valid_n_o    [N-1:0]
 );
 
