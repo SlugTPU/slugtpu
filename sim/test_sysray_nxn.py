@@ -308,7 +308,7 @@ def test_sysray_nxn_each(testcase):
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 2},
+        parameters={"N": 8},
         testcase=testcase,
     )
 
@@ -318,5 +318,5 @@ def test_sysray_nxn_all():
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 2},
+        parameters={"N": 8},
     )
