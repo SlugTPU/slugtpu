@@ -175,6 +175,8 @@ async def test_basic_matmul_matrix(dut):
             cocotb.log.info(f"out[{m}][{j}] = {got}  (expected {exp})")
             assert got == exp, f"row {m}, col {j}: expected {exp}, got {got}"
 
+    await FallingEdge(dut.clk_i)
+
 
 @cocotb.test()
 async def test_random_matmul_matrix(dut):
@@ -208,43 +210,47 @@ async def test_random_matmul_matrix(dut):
             cocotb.log.info(f"out[{m}][{j}] = {got}  (expected {exp})")
             assert got == exp, f"row {m}, col {j}: expected {exp}, got {got}"
 
+    await FallingEdge(dut.clk_i)
+
 @cocotb.test()
 async def test_shadow_buffer(dut):
-      N = dut.N.value.to_unsigned()
+    N = dut.N.value.to_unsigned()
 
-      await clock_start(dut.clk_i)
-      await reset_sequence(dut.clk_i, dut.rst_i)
+    await clock_start(dut.clk_i)
+    await reset_sequence(dut.clk_i, dut.rst_i)
 
-      act_matrix0 = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
-      act_matrix1 = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
-      weights0    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
-      weights1    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+    act_matrix0 = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+    act_matrix1 = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+    weights0    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+    weights1    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
 
-      expected0   = mat_mat_mul_ref(act_matrix0, weights0)
-      expected1  = mat_mat_mul_ref(act_matrix1, weights1)
+    expected0   = mat_mat_mul_ref(act_matrix0, weights0)
+    expected1  = mat_mat_mul_ref(act_matrix1, weights1)
 
-      cocotb.log.info(f"act_matrix0={act_matrix0}")
-      cocotb.log.info(f"weights0={weights0}")
-      cocotb.log.info(f"expected0={expected0}")
+    cocotb.log.info(f"act_matrix0={act_matrix0}")
+    cocotb.log.info(f"weights0={weights0}")
+    cocotb.log.info(f"expected0={expected0}")
 
-      cocotb.log.info(f"act_matrix1={act_matrix1}")
-      cocotb.log.info(f"weights1={weights1}")
-      cocotb.log.info(f"expected1={expected1}")
+    cocotb.log.info(f"act_matrix1={act_matrix1}")
+    cocotb.log.info(f"weights1={weights1}")
+    cocotb.log.info(f"expected1={expected1}")
 
-      cocotb.start_soon(load_two_banks(dut, N, weights0, weights1))                                                                                                
-      for _ in range(N):                                                                                                                                             
-          await FallingEdge(dut.clk_i)           # bank0 col0 done → stream                                                                                          
-      result0, result1 = await stream_two_matrices(dut, N, act_matrix0, act_matrix1)    
-      cocotb.log.info(f"result0={result0}, expected0={expected0}")
-      cocotb.log.info(f"result1={result1}, expected1={expected1}")
-      for m in range(N):
-            for j in range(N):
-                got0 = result0[m][j]
-                exp0 = expected0[m][j]
-                got1 = result1[m][j]
-                exp1 = expected1[m][j]
-                assert got0 == exp0, f"bank 0, row {m}, col {j}: expected {exp0}, got {got0}"
-                assert got1 == exp1, f"bank 1, row {m}, col {j}: expected {exp1}, got {got1}"
+    cocotb.start_soon(load_two_banks(dut, N, weights0, weights1))                                                                                                
+    for _ in range(N):                                                                                                                                             
+        await FallingEdge(dut.clk_i)           # bank0 col0 done → stream                                                                                          
+    result0, result1 = await stream_two_matrices(dut, N, act_matrix0, act_matrix1)    
+    cocotb.log.info(f"result0={result0}, expected0={expected0}")
+    cocotb.log.info(f"result1={result1}, expected1={expected1}")
+    for m in range(N):
+          for j in range(N):
+              got0 = result0[m][j]
+              exp0 = expected0[m][j]
+              got1 = result1[m][j]
+              exp1 = expected1[m][j]
+              assert got0 == exp0, f"bank 0, row {m}, col {j}: expected {exp0}, got {got0}"
+              assert got1 == exp1, f"bank 1, row {m}, col {j}: expected {exp1}, got {got1}"
+
+    await FallingEdge(dut.clk_i)
 
 tests = [
     "reset_test",
