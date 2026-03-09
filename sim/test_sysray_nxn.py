@@ -161,7 +161,9 @@ async def test_basic_matmul_matrix(dut):
     cocotb.log.info(f"weights={weights}")
     cocotb.log.info(f"expected={expected}")
 
-    await load_weights(dut, N, weights)
+    cocotb.start_soon(load_weights(dut, N, weights))
+    for _ in range(N):                          # wait for col 0 to finish loading
+        await FallingEdge(dut.clk_i)
     results = await stream_activation_matrix(dut, N, act_matrix)
 
     for m, (row_got, row_exp) in enumerate(zip(results, expected)):
@@ -191,7 +193,9 @@ async def test_random_matmul_matrix(dut):
     cocotb.log.info(f"weights={weights}")
     cocotb.log.info(f"expected={expected}")
 
-    await load_weights(dut, N, weights)
+    cocotb.start_soon(load_weights(dut, N, weights))
+    for _ in range(N):                          # wait for col 0 to finish loading
+        await FallingEdge(dut.clk_i)
     results = await stream_activation_matrix(dut, N, act_matrix)
 
     for m, (row_got, row_exp) in enumerate(zip(results, expected)):
