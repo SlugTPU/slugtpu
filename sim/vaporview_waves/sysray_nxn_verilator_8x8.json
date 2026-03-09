@@ -1,15 +1,11 @@
 {
   "extensionVersion": "1.5.0",
-  "fileName": "/Users/raph/slugtpu/sim_build/verilator/test_sysray_nxn/test_basic_matmul_matrix/N_8/dump.fst",
+  "fileName": "/Users/raph/slugtpu/sim_build/verilator/test_sysray_nxn/test_shadow_buffer/N_8/dump.fst",
   "markerTime": 161316,
   "altMarkerTime": null,
-  "selectedSignal": {
-    "name": "sysray_nxn.weight_valid_n_i",
-    "msb": 7,
-    "lsb": 7
-  },
-  "zoomRatio": 0.0028914044796764737,
-  "scrollLeft": 109880,
+  "selectedSignal": null,
+  "zoomRatio": 0.0009545790086562854,
+  "scrollLeft": 179786,
   "displayedSignals": [
     {
       "dataType": "signal-group",
@@ -160,6 +156,115 @@
     },
     {
       "dataType": "netlist-variable",
+      "netlistId": 95,
+      "name": "sysray_nxn.act_n_i.[0]",
+      "numberFormat": "hexadecimal",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "[0]",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 96,
+      "name": "sysray_nxn.act_n_i.[1]",
+      "numberFormat": "hexadecimal",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "[1]",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 97,
+      "name": "sysray_nxn.act_n_i.[2]",
+      "numberFormat": "hexadecimal",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "[2]",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 98,
+      "name": "sysray_nxn.act_n_i.[3]",
+      "numberFormat": "hexadecimal",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "[3]",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 99,
+      "name": "sysray_nxn.act_n_i.[4]",
+      "numberFormat": "hexadecimal",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "[4]",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 100,
+      "name": "sysray_nxn.act_n_i.[5]",
+      "numberFormat": "hexadecimal",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "[5]",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 101,
+      "name": "sysray_nxn.act_n_i.[6]",
+      "numberFormat": "hexadecimal",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "[6]",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "netlist-variable",
+      "netlistId": 102,
+      "name": "sysray_nxn.act_n_i.[7]",
+      "numberFormat": "hexadecimal",
+      "colorIndex": 0,
+      "rowHeight": 1,
+      "verticalScale": 1,
+      "nameType": "fullPath",
+      "customName": "[7]",
+      "renderType": "multiBit",
+      "valueLinkCommand": ""
+    },
+    {
+      "dataType": "signal-separator",
+      "label": "---",
+      "rowHeight": 1
+    },
+    {
+      "dataType": "netlist-variable",
       "netlistId": 111,
       "name": "sysray_nxn.weight_valid_n_i",
       "numberFormat": "binary",
@@ -263,6 +368,11 @@
       "valueLinkCommand": ""
     },
     {
+      "dataType": "signal-separator",
+      "label": "---",
+      "rowHeight": 1
+    },
+    {
       "dataType": "netlist-variable",
       "netlistId": 152,
       "name": "sysray_nxn.psum_out_n_o.[1]",
@@ -320,11 +430,6 @@
       "rowHeight": 1
     },
     {
-      "dataType": "signal-separator",
-      "label": "---",
-      "rowHeight": 1
-    },
-    {
       "dataType": "netlist-variable",
       "netlistId": 189,
       "name": "sysray_nxn.row_block[0].col_block[0].pe_ij.active_weight",
@@ -339,7 +444,7 @@
     },
     {
       "dataType": "netlist-variable",
-      "netlistId": 212,
+      "netlistId": 213,
       "name": "sysray_nxn.row_block[0].col_block[1].pe_ij.active_weight",
       "numberFormat": "signed",
       "colorIndex": 0,
@@ -352,7 +457,7 @@
     },
     {
       "dataType": "netlist-variable",
-      "netlistId": 373,
+      "netlistId": 381,
       "name": "sysray_nxn.row_block[1].col_block[0].pe_ij.active_weight",
       "numberFormat": "signed",
       "colorIndex": 0,
@@ -365,7 +470,7 @@
     },
     {
       "dataType": "netlist-variable",
-      "netlistId": 396,
+      "netlistId": 405,
       "name": "sysray_nxn.row_block[1].col_block[1].pe_ij.active_weight",
       "numberFormat": "signed",
       "colorIndex": 0,
