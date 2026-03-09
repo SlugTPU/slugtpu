@@ -107,35 +107,36 @@ async def load_weight_banks(dut, N, weight_banks):
     await FallingEdge(dut.clk_i)
     dut.weight_valid_n_i[N-1].value = 0
 
-async def stream_two_activations(dut, N, mat0, mat1):                                                                                             
-    results0 = [[None]*N for _ in range(N)]                                                                                                                    
-    results1 = [[None]*N for _ in range(N)]                                                                                                                    
+async def stream_activation_banks(dut, N, act_banks):                                                                                             
+    results = [[[None]*N for _ in range(N)] for _ in range(len(act_banks))]
                                                                                                                                                                 
-    for cycle in range(2*N + 2*N - 1):                                                                                                                         
-        await FallingEdge(dut.clk_i)                                                                                                                           
-        for i in range(N):                                                                                                                                     
-            m = cycle - i
-            if 0 <= m < N:                                                                                                                                     
-                dut.act_sel_n_i[i].value   = 0                                                                                                              
-                dut.act_n_i[i].value       = mat0[m][i]                                                                                                        
-                dut.act_valid_n_i[i].value = 1                                                                                                                 
-            elif N <= m < 2*N:                                                                                                                                 
-                dut.act_sel_n_i[i].value   = 1                                                                                                              
-                dut.act_n_i[i].value       = mat1[m-N][i]                                                                                                      
-                dut.act_valid_n_i[i].value = 1                                                                                                                 
-            else:                                                                                                                                              
-                dut.act_n_i[i].value       = 0                                                                                                                 
-                dut.act_valid_n_i[i].value = 0                                                                                                                 
-                
-        for j in range(N):                                                                                                                                     
-            if dut.psum_out_valid_n_o[j].value == 1:
-                m = cycle - N - j                                                                                                                              
-                if 0 <= m < N:                                                                                                                                 
-                    results0[m][j] = dut.psum_out_n_o[j].value.to_signed()
-                elif N <= m < 2*N:                                                                                                                             
-                    results1[m-N][j] = dut.psum_out_n_o[j].value.to_signed()
+    K = len(act_banks)  # number of activation banks to load
 
-    return results0, results1 
+    for cycle in range((K+2)*N - 1):          
+        await FallingEdge(dut.clk_i)                                                                                                                           
+        for col in range(N):                                                                                                                                   
+            # stripped cycle index to retrieve column's loading pattern 
+            # (i.e. bank0 col0 loads at t=0, bank0 col1 loads at t=1, ..., bank0 colN-1 loads at t=N-1, ..., bank_n col0 loads at t=kN)
+            t = cycle - col
+            k = t // N      # bank index
+            bk_idx = t % N  # bank k's row index
+
+            if 0 <= t < K*N:                                                                                                                              
+                dut.act_sel_n_i[col].value   = k % 2
+                dut.act_n_i[col].value       = act_banks[k][bk_idx][col]                                                                                    
+                dut.act_valid_n_i[col].value = 1                                                                                                            
+            else:                                                                                                                                            
+                dut.act_n_i[col].value       = 0                                                                                                            
+                dut.act_valid_n_i[col].value = 0
+
+        for col in range(N):                                                                                                                                     
+            t = cycle - N - col
+            k = t // N      # bank index
+            bk_idx = t % N  # bank k's row index
+            if dut.psum_out_valid_n_o[col].value == 1 and 0 <= t < K*N:
+                results[k][bk_idx][col] = dut.psum_out_n_o[col].value.to_signed()
+
+    return results
 
 
 @cocotb.test()
@@ -241,14 +242,14 @@ async def test_shadow_buffer(dut):
     cocotb.start_soon(load_weight_banks(dut, N, [weights0, weights1]))                                                                                                
     for _ in range(N):                                                                                                                                             
         await FallingEdge(dut.clk_i)           # bank0 col0 done → stream                                                                                          
-    result0, result1 = await stream_two_activations(dut, N, act_matrix0, act_matrix1)    
-    cocotb.log.info(f"result0={result0}, expected0={expected0}")
-    cocotb.log.info(f"result1={result1}, expected1={expected1}")
+    results = await stream_activation_banks(dut, N, [act_matrix0, act_matrix1])    
+    cocotb.log.info(f"results0={results[0]}")
+    cocotb.log.info(f"results1={results[1]}")
     for m in range(N):
           for j in range(N):
-              got0 = result0[m][j]
+              got0 = results[0][m][j]
               exp0 = expected0[m][j]
-              got1 = result1[m][j]
+              got1 = results[1][m][j]
               exp1 = expected1[m][j]
               assert got0 == exp0, f"bank 0, row {m}, col {j}: expected {exp0}, got {got0}"
               assert got1 == exp1, f"bank 1, row {m}, col {j}: expected {exp1}, got {got1}"
