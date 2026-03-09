@@ -1,3 +1,14 @@
+// Parameterized N×N systolic array. Weights flow top-down and activations
+// flow left-right through a 2D grid of PEs; partial sums accumulate
+// top-down and the final row drives the output.
+//
+// Double-buffering: to keep the pipeline running across layers, weights and
+// activations use their MSB as a buffer select bit. This allows loading the
+// next layer's weights into the shadow buffer while the current inference is
+// running. This module simply wires PEs together and passes the select bit
+// through — no shadow buffer logic lives here; that is implemented entirely
+// within each PE.
+
 module sysray_nxn #(
   parameter DATA_WIDTH = 8,
   parameter ACC_WIDTH  = 32,
@@ -30,8 +41,8 @@ logic                  psum_valid_conn [N:0][N:0];
 
 genvar i, j;
 generate
-  for (i = 0 ; i < N; i++) begin
-    for (j = 0; j < N; j++) begin
+  for (i = 0 ; i < N; i++) begin  : row_block
+    for (j = 0; j < N; j++) begin : col_block
       if (i == 0) begin
         assign w_conn[i][j] = {1'b0, weight_n_i[j]};
         assign w_valid_conn[i][j] = weight_valid_n_i[j];
