@@ -83,24 +83,26 @@ async def stream_activation_matrix(dut, N, act_matrix, sel=0):
         cocotb.log.info(f"  → output row {m}: {row_out}")
     return results
 
-async def load_two_weights(dut, N, weights0, weights1):                                                                                                          
-    # bank0: cycles 0..2N-2, bank1: N..3N-2, bank3: 2N..4N-2
-    for cycle in range(3 * N - 1):          
+async def load_weight_banks(dut, N, weight_banks):                                                                                                          
+    K = len(weight_banks)  # number of weight banks to load
+
+    # bank0: cycles 0..2N-2, bank1: N..3N-2, bank2: 2N..4N-2
+    for cycle in range((K+1)*N - 1):          
         await FallingEdge(dut.clk_i)                                                                                                                           
         for col in range(N):                                                                                                                                   
-            b0_idx = cycle - col                                                                                                                               
-            b1_idx = cycle - N - col                                                                                                                           
-            if 0 <= b0_idx < N:                                                                                                                              
-                dut.weight_sel_n_i[col].value   = 0                                                                                                            
-                dut.weight_n_i[col].value       = weights0[N-1-b0_idx][col]
-                dut.weight_valid_n_i[col].value = 1                                                                                                            
-            elif 0 <= b1_idx < N:                                                                                                                              
-                dut.weight_sel_n_i[col].value   = 1                                                                                                            
-                dut.weight_n_i[col].value       = weights1[N-1-b1_idx][col]                                                                                    
+            # stripped cycle index to retrieve column's loading pattern 
+            # (i.e. bank0 col0 loads at t=0, bank0 col1 loads at t=1, ..., bank0 colN-1 loads at t=N-1, ..., bank_n col0 loads at t=kN)
+            t = cycle - col
+            k = t // N      # bank index
+            bk_idx = t % N  # bank k's row index
+
+            if 0 <= t < K*N:                                                                                                                              
+                dut.weight_sel_n_i[col].value   = k % 2
+                dut.weight_n_i[col].value       = weight_banks[k][N-1-(bk_idx)][col]                                                                                    
                 dut.weight_valid_n_i[col].value = 1                                                                                                            
             else:                                                                                                                                            
                 dut.weight_n_i[col].value       = 0                                                                                                            
-                dut.weight_valid_n_i[col].value = 0    
+                dut.weight_valid_n_i[col].value = 0
 
     await FallingEdge(dut.clk_i)
     dut.weight_valid_n_i[N-1].value = 0
@@ -236,7 +238,7 @@ async def test_shadow_buffer(dut):
     cocotb.log.info(f"weights1={weights1}")
     cocotb.log.info(f"expected1={expected1}")
 
-    cocotb.start_soon(load_two_weights(dut, N, weights0, weights1))                                                                                                
+    cocotb.start_soon(load_weight_banks(dut, N, [weights0, weights1]))                                                                                                
     for _ in range(N):                                                                                                                                             
         await FallingEdge(dut.clk_i)           # bank0 col0 done → stream                                                                                          
     result0, result1 = await stream_two_activations(dut, N, act_matrix0, act_matrix1)    
