@@ -18,28 +18,14 @@ def mat_mat_mul_ref(act_matrix, weights):
     return [vec_mat_mul_ref(act_row, weights) for act_row in act_matrix]
 
 
+# Note: the following 2 helper functions independently drive weights and activations with diagonal pipelining, 
+#       however for testing shadow buffering, they have limited usecases as they also drive the valid signals
+#       well. For double buffering, use the load_two_banks and stream_two_matrices functions instead, 
+#       which drive both the data and valid signals in a coordinated way.
 
 async def load_weights(dut, N, weights, sel=0):
     """
     Load weights into the systolic array with a diagonal column stagger.
-
-    Column j starts its row sweep j cycles after column 0, mirroring the
-    diagonal wavefront used by stream_activation_matrix.  At each cycle c,
-    column j is active when 0 <= c - j < N and receives weights[N-1-(c-j)][j]
-    (bottom-to-top sweep, same as before).
-
-    Drive schedule (N=2 example):
-      cycle 0: col0 = w[1][0]
-      cycle 1: col0 = w[0][0],  col1 = w[1][1]   ← two columns active
-      cycle 2:                   col1 = w[0][1]
-
-    Total drive cycles: 2*N - 1.  After the sweep, one deassert cycle clears
-    weight_valid for all columns.
-
-    sel: 0 or 1 — selects which PE weight bank receives the data.
-    weight_sel_n_i is driven atomically with the first valid weight for each
-    column; driving it before valid would toggle prev_weight_sel in every PE
-    and corrupt the downstream weight_buf.
     """
     for cycle in range(2 * N - 1):
         await FallingEdge(dut.clk_i)
@@ -61,31 +47,11 @@ async def load_weights(dut, N, weights, sel=0):
         dut.weight_valid_n_i[col].value = 0
 
 
-
 async def stream_activation_matrix(dut, N, act_matrix, sel=0):
     """
-    Stream an M×N activation matrix through the systolic array with diagonal pipelining.
+    Stream an N×N activation matrix through the systolic array with diagonal pipelining.
 
-    At each cycle c, every array row i that has a valid vector in flight is driven
-    simultaneously: vector m = c - i is active on row i when 0 ≤ m < M.  This
-    fills the array on a diagonal wavefront — no bubbles between vectors.
-
-    Drive schedule (N=2, M=2 example):
-      cycle 0: row0 = act[0][0]
-      cycle 1: row0 = act[1][0],  row1 = act[0][1]   ← two rows active at once
-      cycle 2:                    row1 = act[1][1]
-
-    Total drive cycles = M + N - 1 (vs M*N for sequential).
-
-    Output timing: col j of vector m fires at FallingEdge m + N + j.  Multiple
-    columns can be valid on the same cycle, so results are indexed directly via
-    m = cycle - N - j rather than collected in a flat list.
-
-    The loop runs for M + 2*N - 1 FallingEdges:
-      - Cycles 0 .. M+N-2  : drive (diagonal wavefront)
-      - Cycles M+N-1 .. M+2N-2 : inputs idle; drain last vector's outputs
-
-    Returns an M×N list of output rows.
+    Returns an N×N list of output rows.
     """
     results = [[None] * N for _ in range(N)]
 
@@ -108,7 +74,7 @@ async def stream_activation_matrix(dut, N, act_matrix, sel=0):
             if dut.psum_out_valid_n_o[j].value == 1:
                 m = cycle - N - j
                 if 0 <= m < N:
-                    results[m][j] = int(dut.psum_out_n_o[j].value)
+                    results[m][j] = dut.psum_out_n_o[j].value.to_signed()
 
     for r in range(N):
         for j in range(N):
@@ -162,9 +128,9 @@ async def stream_two_matrices(dut, N, mat0, mat1):
             if dut.psum_out_valid_n_o[j].value == 1:
                 m = cycle - N - j                                                                                                                              
                 if 0 <= m < N:                                                                                                                                 
-                    results0[m][j] = int(dut.psum_out_n_o[j].value)                                                                                            
+                    results0[m][j] = dut.psum_out_n_o[j].value.to_signed()
                 elif N <= m < 2*N:                                                                                                                             
-                    results1[m-N][j] = int(dut.psum_out_n_o[j].value)                                                                                          
+                    results1[m-N][j] = dut.psum_out_n_o[j].value.to_signed()
 
     return results0, results1 
 
@@ -223,8 +189,8 @@ async def test_random_matmul_matrix(dut):
     await clock_start(dut.clk_i)
     await reset_sequence(dut.clk_i, dut.rst_i)
 
-    act_matrix = [[random.randint(0, 7) for _ in range(N)] for _ in range(M)]
-    weights    = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
+    act_matrix = [[random.randint(-128, 127) for _ in range(N)] for _ in range(M)]
+    weights    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
     expected   = mat_mat_mul_ref(act_matrix, weights)
 
     cocotb.log.info(f"N={N}, M={M}")
@@ -249,10 +215,10 @@ async def test_shadow_buffer(dut):
       await clock_start(dut.clk_i)
       await reset_sequence(dut.clk_i, dut.rst_i)
 
-      act_matrix0 = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
-      act_matrix1 = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
-      weights0    = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
-      weights1    = [[random.randint(0, 7) for _ in range(N)] for _ in range(N)]
+      act_matrix0 = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+      act_matrix1 = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+      weights0    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+      weights1    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
 
       expected0   = mat_mat_mul_ref(act_matrix0, weights0)
       expected1  = mat_mat_mul_ref(act_matrix1, weights1)
@@ -271,8 +237,14 @@ async def test_shadow_buffer(dut):
       result0, result1 = await stream_two_matrices(dut, N, act_matrix0, act_matrix1)    
       cocotb.log.info(f"result0={result0}, expected0={expected0}")
       cocotb.log.info(f"result1={result1}, expected1={expected1}")
-      assert result0 == expected0, f"Matrix 0: expected {expected0}, got {result0}"
-      assert result1 == expected1, f"Matrix 1: expected {expected1}, got {result1}"
+      for m in range(N):
+            for j in range(N):
+                got0 = result0[m][j]
+                exp0 = expected0[m][j]
+                got1 = result1[m][j]
+                exp1 = expected1[m][j]
+                assert got0 == exp0, f"bank 0, row {m}, col {j}: expected {exp0}, got {got0}"
+                assert got1 == exp1, f"bank 1, row {m}, col {j}: expected {exp1}, got {got1}"
 
 tests = [
     "reset_test",
