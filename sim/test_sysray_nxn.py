@@ -217,7 +217,8 @@ async def test_random_matmul_matrix(dut):
     await FallingEdge(dut.clk_i)
 
 @cocotb.test()
-async def test_shadow_buffer(dut):
+async def test_shadow_buffer_2(dut):
+    """Test shadow buffering by interleaving two different weight banks back-to-back"""
     N = dut.N.value.to_unsigned()
 
     await clock_start(dut.clk_i)
@@ -256,11 +257,63 @@ async def test_shadow_buffer(dut):
 
     await FallingEdge(dut.clk_i)
 
+@cocotb.test()
+async def test_shadow_buffer_3(dut):
+    """Test shadow buffering by interleaving three different weight banks back-to-back"""
+    N = dut.N.value.to_unsigned()
+
+    await clock_start(dut.clk_i)
+    await reset_sequence(dut.clk_i, dut.rst_i)
+
+    act_matrix0 = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+    act_matrix1 = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+    act_matrix2 = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+    weights0    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+    weights1    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+    weights2    = [[random.randint(-128, 127) for _ in range(N)] for _ in range(N)]
+
+    expected0   = mat_mat_mul_ref(act_matrix0, weights0)
+    expected1  = mat_mat_mul_ref(act_matrix1, weights1)
+    expected2  = mat_mat_mul_ref(act_matrix2, weights2)
+
+    cocotb.log.info(f"act_matrix0={act_matrix0}")
+    cocotb.log.info(f"weights0={weights0}")
+    cocotb.log.info(f"expected0={expected0}")
+
+    cocotb.log.info(f"act_matrix1={act_matrix1}")
+    cocotb.log.info(f"weights1={weights1}")
+    cocotb.log.info(f"expected1={expected1}")
+
+    cocotb.log.info(f"act_matrix2={act_matrix2}")
+    cocotb.log.info(f"weights2={weights2}")
+    cocotb.log.info(f"expected2={expected2}")
+
+    cocotb.start_soon(load_weight_banks(dut, N, [weights0, weights1, weights2]))                                                                                                
+    for _ in range(N):
+        await FallingEdge(dut.clk_i)           # bank0 col0 done → stream                                                                                          
+    results = await stream_activation_banks(dut, N, [act_matrix0, act_matrix1, act_matrix2])    
+    cocotb.log.info(f"results0={results[0]}")
+    cocotb.log.info(f"results1={results[1]}")
+    cocotb.log.info(f"results2={results[2]}")
+    for m in range(N):
+          for j in range(N):
+              got0 = results[0][m][j]
+              exp0 = expected0[m][j]
+              got1 = results[1][m][j]
+              exp1 = expected1[m][j]
+              got2 = results[2][m][j]
+              exp2 = expected2[m][j]
+              assert got0 == exp0, f"bank 0, row {m}, col {j}: expected {exp0}, got {got0}"
+              assert got1 == exp1, f"bank 1, row {m}, col {j}: expected {exp1}, got {got1}"
+              assert got2 == exp2, f"bank 2, row {m}, col {j}: expected {exp2}, got {got2}"
+
+    await FallingEdge(dut.clk_i)
+
 tests = [
     "reset_test",
     "test_basic_matmul_matrix",
     "test_random_matmul_matrix",
-    "test_shadow_buffer",
+    "test_shadow_buffer_2",
 ]
 
 proj_path = Path("./rtl").resolve()
