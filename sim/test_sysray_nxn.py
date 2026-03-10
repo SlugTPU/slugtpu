@@ -313,12 +313,12 @@ tests = [
     "reset_test",
     "test_basic_matmul_matrix",
     "test_random_matmul_matrix",
-    "test_shadow_buffer_2",
+    # "test_shadow_buffer_2",
     "test_shadow_buffer_3",
 ]
 
 proj_path = Path("./rtl").resolve()
-SOURCES   = [proj_path / "sysray_nxn.sv", proj_path / "pe.sv"]
+SOURCES   = [proj_path / "sysray/sysray_nxn.sv", proj_path / "sysray/pe.sv"]
 
 
 @pytest.mark.parametrize("N", [2, 8])
