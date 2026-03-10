@@ -321,21 +321,23 @@ proj_path = Path("./rtl").resolve()
 SOURCES   = [proj_path / "sysray_nxn.sv", proj_path / "pe.sv"]
 
 
+@pytest.mark.parametrize("N", [2, 8])
 @pytest.mark.parametrize("testcase", tests)
-def test_sysray_nxn_each(testcase):
+def test_sysray_nxn_each(N, testcase):
     run_test(
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 8},
+        parameters={"N": N},
         testcase=testcase,
     )
 
 
-def test_sysray_nxn_all():
+@pytest.mark.parametrize("N", [2, 8])
+def test_sysray_nxn_all(N):
     run_test(
         sources=SOURCES,
         module_name="test_sysray_nxn",
         hdl_toplevel="sysray_nxn",
-        parameters={"N": 8},
+        parameters={"N": N},
     )
