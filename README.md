@@ -124,7 +124,6 @@ make clean
 | `test_add_n` | Vectorized bias adder |
 | `test_relu_n` | Vectorized ReLU |
 | `test_scale_n` | Vectorized fixed point scale |
-| `test_quantizer_mul` | Fixed point quantized multiplier |
 | `test_fifo` | FIFO |
 | `test_spi` | SPI slave |
 | `test_sram` | SRAM controller |
