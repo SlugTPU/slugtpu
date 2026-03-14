@@ -144,7 +144,8 @@ make clean
 
 [**LiteDRAM**](https://github.com/enjoy-digital/litedram): A [LiteX Framework](https://github.com/enjoy-digital/litex) tool handling interface with DRAM
 
-This project was inspired by [TinyTPU](https://github.com/tiny-tpu-v2/tiny-tpu) and Google's [TPU]([https://github.com/google-coral/coralnpu](https://arxiv.org/pdf/1704.04760))
+This project was inspired by [TinyTPU](https://github.com/tiny-tpu-v2/tiny-tpu) and Google's [TPU](https://github.com/google-coral/coralnpu](https://arxiv.org/pdf/1704.04760)
 
+---
 
 Developed as part of the UCSC CSE 127A/B capstone course.
