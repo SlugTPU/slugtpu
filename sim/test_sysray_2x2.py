@@ -168,7 +168,7 @@ async def test_basic_flow(dut):
 
 tests = ["test_basic_flow"]
 
-proj_path = Path("./src").resolve()
+proj_path = Path("./rtl").resolve()
 sources = [ proj_path/"sysray_2x2.sv", proj_path/"pe.sv" ]
 
 @pytest.mark.parametrize("testcase", tests)
