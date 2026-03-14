@@ -119,8 +119,6 @@ make clean
 | Target | Module Under Test |
 |---|---|
 | `test_sysray_nxn` | N x N systolic array |
-| `test_sysray_2x2` | 2 x 2 systolic array |
-| `test_pe_col` | PE column |
 | `test_scalar_pipe` | Test scalar units |
 | `test_scalar_stage` | Test scalar units, including loading |
 | `test_add_n` | Vectorized bias adder |
@@ -135,7 +133,6 @@ make clean
 | `test_write_transaction` | SRAM write transaction |
 | `test_tri` | Triangle shifter |
 | `test_load` | Data loader |
-| `test_bias` | Bias adder |
 ---
 
 ## Open Source Frameworks/Cores Used
