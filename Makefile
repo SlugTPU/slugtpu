@@ -28,9 +28,6 @@ test_sram:
 test_tri:
 	python3 -m pytest sim/test_tri.py -s
 
-test_quantizer_mul:
-	python3 -m pytest sim/test_quantizer_mul.py -s
-
 test_write_transaction:
 	python3 -m pytest sim/test_write_transaction.py -s
 
