@@ -81,7 +81,7 @@ module loadsysray #(
         .data_o(weight_o)
     );
 
-    logic [DATA_WIDTH-1:0] sys_out [N],                                                                                                                     
+    logic [DATA_WIDTH-1:0] sys_out [N];
 
 
     sysray_nxn #(

@@ -96,6 +96,7 @@ sources = [
     proj_path / "loadsysray.sv",
     proj_path / "sysray_nxn.sv",
     proj_path / "tri_shift.sv",
+    proj_path / "utils" / "shift.sv",
     proj_path / "pe.sv",
 ]
 
