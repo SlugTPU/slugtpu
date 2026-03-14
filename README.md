@@ -1,4 +1,6 @@
-# SlugTPU | A Quantized Neural Network Accelerator ASIC
+# SlugTPU 
+
+**A Quantized Neural Network Accelerator ASIC**
 
 SlugTPU is an open source tensor processing unit that is designed to accelerate quantized neural network inference. We feature a parameterizable N x N systolic array with a full scalar post processing pipleline, on-chip SRAM, SPI host communication, and off-chip DRAM support via LiteDRAM. The design runs INT8 matrix multiplications with 32 bit accumulation, with hardware quantization to convert outputs back into INT8 for layer chaining.
 
